@@ -1,0 +1,17 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+*.log
+
+# IDE & OS
+.vscode/
+.DS_Store
+
+# Optional: exclude large data files
+# data/raw/*.pdf
+# data/raw/*.docx

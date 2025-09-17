@@ -1,0 +1,11 @@
+openai
+faiss-cpu
+streamlit
+pandas
+python-dotenv
+requests
+PyPDF2
+python-docx
+numpy
+sentence-transformers
+torch
