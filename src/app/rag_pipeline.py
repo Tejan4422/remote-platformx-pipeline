@@ -32,8 +32,11 @@ class RAGPipeline:
         # Search for similar chunks
         results = self.vector_store.similarity_search(query_embedding, top_k)
         
+        # Extract text content from tuples (id, text, score)
+        texts = [result[1] for result in results]
+        
         # Combine retrieved chunks into context
-        context = "\n\n".join(results)
+        context = "\n\n".join(texts)
         return context
     
     def generate_answer(self, query: str, context: str) -> str:

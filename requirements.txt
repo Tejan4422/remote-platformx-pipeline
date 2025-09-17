@@ -9,3 +9,4 @@ python-docx
 numpy
 sentence-transformers
 torch
+requests
