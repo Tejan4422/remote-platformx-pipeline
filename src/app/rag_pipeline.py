@@ -41,14 +41,23 @@ class RAGPipeline:
     
     def generate_answer(self, query: str, context: str) -> str:
         """Generate answer using Ollama"""
-        prompt = f"""Answer the following question based only on the provided context. If the answer cannot be found in the context, say "I don't have enough information to answer that question."
+        prompt = f"""You are a professional sales consultant responding to a Request for Proposal (RFP). Based on the provided context, answer the requirement thoroughly and professionally.
+
+Guidelines:
+- Provide a concise summary between 100-150 words
+- Treat the input as a question requiring detailed explanation
+- Elaborate thoroughly - avoid simple yes/no answers
+- Do not reference specific document names, file sources, or business entity names
+- Answer as a knowledgeable sales professional would
+- If information is insufficient, state "Based on available information, I cannot provide a complete response to this requirement" rather than fabricating details
+- Focus on capabilities and solutions rather than documentation references
 
 Context:
 {context}
 
-Question: {query}
+Requirement: {query}
 
-Answer:"""
+Response:"""
 
         try:
             response = requests.post(
@@ -56,7 +65,11 @@ Answer:"""
                 json={
                     "model": self.model,
                     "prompt": prompt,
-                    "stream": False
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.3,
+                        "top_p": 0.9
+                    }
                 },
                 timeout=60
             )
