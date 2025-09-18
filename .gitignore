@@ -7,6 +7,7 @@ __pycache__/
 *$py.class
 venv/
 *.log
+.env
 
 # IDE & OS
 .vscode/
