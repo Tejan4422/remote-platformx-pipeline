@@ -7,7 +7,6 @@ from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ingestion.document_processor import process_document
 from ingestion.requirement_extractor import extract_requirements_from_file
 from app.rag_pipeline import RAGPipeline
 from app.output_generator import OutputGenerator
@@ -21,23 +20,28 @@ def main():
     )
     
     st.title("🔍 RFP Response Generator")
-    st.markdown("Upload your RFP document and knowledge base, then generate professional responses automatically!")
+    st.markdown("Upload your RFP document to extract requirements and generate professional responses using our pre-built knowledge base!")
     
     # Initialize session state
     if 'requirements' not in st.session_state:
         st.session_state.requirements = []
     if 'responses' not in st.session_state:
         st.session_state.responses = []
-    if 'vector_store_ready' not in st.session_state:
-        st.session_state.vector_store_ready = False
-    if 'knowledge_docs_processed' not in st.session_state:
-        st.session_state.knowledge_docs_processed = False
     
-    # Step 1: Upload RFP Document
+    # Check if vector store exists
+    vector_store_path = Path("test_store")
+    vector_store_ready = vector_store_path.exists() and (vector_store_path / "index.faiss").exists()
+    
+    if not vector_store_ready:
+        st.error("❌ Vector store not found! Please ensure your knowledge base is properly set up in the 'test_store' directory.")
+        st.stop()
+    
+    # Step 1: Upload RFP Document and Extract Requirements
     st.header("📄 Step 1: Upload RFP Document")
+    st.markdown("Upload your RFP document containing the requirements you need to respond to.")
     
     rfp_file = st.file_uploader(
-        "Upload your RFP document containing requirements", 
+        "Upload your RFP document", 
         type=['pdf', 'docx'],
         help="Upload a PDF or DOCX file containing the RFP requirements you want to respond to."
     )
@@ -75,7 +79,7 @@ def main():
     
     # Show extracted requirements
     if st.session_state.requirements:
-        st.subheader("📋 Extracted Requirements")
+        st.header("📋 Step 2: Review Extracted Requirements")
         
         # Option to edit requirements
         edit_mode = st.checkbox("✏️ Edit Requirements")
@@ -103,76 +107,10 @@ def main():
             for i, req in enumerate(st.session_state.requirements, 1):
                 with st.expander(f"Requirement {i}", expanded=False):
                     st.write(req)
-    
-    # Step 2: Upload Knowledge Base
-    if st.session_state.requirements:
-        st.header("🧠 Step 2: Upload Knowledge Base Documents")
-        st.markdown("Upload documents that contain information to answer the RFP requirements.")
         
-        knowledge_files = st.file_uploader(
-            "Upload knowledge base documents", 
-            type=['pdf', 'docx'],
-            accept_multiple_files=True,
-            help="Upload documents containing information that will be used to answer the RFP requirements.",
-            key="knowledge_files"
-        )
-        
-        if knowledge_files:
-            if st.button("🔨 Process Knowledge Base", type="primary"):
-                with st.spinner("Processing documents and building knowledge base..."):
-                    try:
-                        # Create directories
-                        Path("data/raw").mkdir(parents=True, exist_ok=True)
-                        Path("data/processed").mkdir(parents=True, exist_ok=True)
-                        
-                        all_chunks = []
-                        
-                        # Process each uploaded file
-                        progress_bar = st.progress(0)
-                        for idx, uploaded_file in enumerate(knowledge_files):
-                            # Save temporarily
-                            temp_path = Path("data/raw") / uploaded_file.name
-                            with open(temp_path, "wb") as f:
-                                f.write(uploaded_file.getvalue())
-                            
-                            # Process document
-                            chunks = process_document(str(temp_path))
-                            all_chunks.extend(chunks)
-                            
-                            progress_bar.progress((idx + 1) / len(knowledge_files))
-                            st.success(f"✅ Processed {uploaded_file.name}: {len(chunks)} chunks")
-                        
-                        # Build vector store
-                        st.info("Building vector store...")
-                        
-                        # Import and use existing vector store functionality
-                        from retrieval.embeddings import embed_text
-                        from vector_store.vector_store import FAISSStore
-                        
-                        # Create vector store
-                        vector_store = FAISSStore(dimension=384)  # sentence-transformers dimension
-                        
-                        # Create embeddings and add to vector store
-                        chunk_progress = st.progress(0)
-                        for i, chunk in enumerate(all_chunks):
-                            embedding = embed_text(chunk)
-                            vector_store.add_text(chunk, embedding)
-                            chunk_progress.progress((i + 1) / len(all_chunks))
-                        
-                        # Save vector store
-                        vector_store.save("test_store")
-                        
-                        st.session_state.vector_store_ready = True
-                        st.session_state.knowledge_docs_processed = True
-                        st.success(f"🎉 Knowledge base built successfully with {len(all_chunks)} text chunks!")
-                        
-                    except Exception as e:
-                        st.error(f"Error building knowledge base: {str(e)}")
-                        st.exception(e)
-    
-    # Step 3: Generate Responses
-    if st.session_state.requirements and st.session_state.vector_store_ready:
+        # Step 3: Generate Responses
         st.header("⚡ Step 3: Generate Responses")
+        st.success(f"✅ Knowledge base is ready! Using existing vector store with company information.")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -181,8 +119,8 @@ def main():
             ollama_model = st.selectbox("Ollama Model", ["llama3", "llama2", "mistral", "codellama"], index=0)
         
         if st.button("🚀 Generate All Responses", type="primary"):
-            # Initialize RAG pipeline
-            rag = RAGPipeline(model=ollama_model)
+            # Initialize RAG pipeline with existing vector store
+            rag = RAGPipeline(model=ollama_model, store_dir="test_store")
             
             # Progress tracking
             progress_bar = st.progress(0)
@@ -195,7 +133,7 @@ def main():
                 for i, requirement in enumerate(st.session_state.requirements):
                     status_text.text(f"Processing requirement {i+1}/{len(st.session_state.requirements)}: {requirement[:50]}...")
                     
-                    # Process requirement
+                    # Process requirement using existing vector store
                     result = rag.ask(requirement, top_k)
                     results.append({
                         "requirement": requirement,
@@ -220,8 +158,8 @@ def main():
                 with st.expander("📋 Preview Generated Responses", expanded=True):
                     for i, result in enumerate(results[:3], 1):  # Show first 3
                         st.markdown(f"### Requirement {i}")
-                        st.markdown(f"**Question:** {result['requirement'][:100]}...")
-                        st.markdown(f"**Response:** {result['response'][:200]}...")
+                        st.markdown(f"**Question:** {result['requirement'][:150]}...")
+                        st.markdown(f"**Response:** {result['response'][:300]}...")
                         st.markdown("---")
                     
                     if len(results) > 3:
@@ -297,19 +235,20 @@ def main():
     
     # Sidebar with status and help
     with st.sidebar:
-        st.markdown("## � Progress Status")
+        st.markdown("## 📊 System Status")
+        
+        # Vector store status
+        if vector_store_ready:
+            st.success("✅ Knowledge base ready")
+            st.caption("Using pre-built company knowledge base")
+        else:
+            st.error("❌ Knowledge base not found")
         
         # Requirements status
         if st.session_state.requirements:
             st.success(f"✅ {len(st.session_state.requirements)} requirements extracted")
         else:
             st.info("🔄 Upload RFP document to extract requirements")
-        
-        # Knowledge base status
-        if st.session_state.vector_store_ready:
-            st.success("✅ Knowledge base ready")
-        else:
-            st.info("🔄 Upload knowledge documents to build RAG system")
         
         # Responses status
         if st.session_state.responses:
@@ -319,21 +258,22 @@ def main():
         
         st.markdown("---")
         st.markdown("## 🔄 Reset")
-        if st.button("🗑️ Clear All Data"):
+        if st.button("🗑️ Clear Session Data"):
             st.session_state.requirements = []
             st.session_state.responses = []
-            st.session_state.vector_store_ready = False
-            st.session_state.knowledge_docs_processed = False
-            st.success("All data cleared!")
+            st.success("Session data cleared!")
             st.experimental_rerun()
         
         st.markdown("---")
-        st.markdown("## 💡 Tips")
+        st.markdown("## 💡 How It Works")
         st.markdown("""
-        - Upload clear, well-formatted RFP documents
-        - Include comprehensive knowledge base documents
-        - Review extracted requirements before processing
-        - Start with smaller models for faster testing
+        1. **Upload RFP**: Upload your RFP document 
+        2. **Extract**: Automatically extract requirements
+        3. **Review**: Check and edit requirements if needed
+        4. **Generate**: Use existing knowledge base to create responses
+        5. **Download**: Get Excel, PDF, or CSV files
+        
+        **Note:** Responses are generated from your pre-built company knowledge base stored in the system.
         """)
 
 if __name__ == "__main__":

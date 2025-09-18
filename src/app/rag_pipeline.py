@@ -41,23 +41,22 @@ class RAGPipeline:
     
     def generate_answer(self, query: str, context: str) -> str:
         """Generate answer using Ollama"""
-        prompt = f"""You are a professional sales consultant responding to a Request for Proposal (RFP). Based on the provided context, answer the requirement thoroughly and professionally.
+        prompt = f"""You are an experienced business professional responding to a client inquiry. Write a natural, conversational response that directly addresses their question.
 
-Guidelines:
-- Provide a concise summary between 100-150 words
-- Treat the input as a question requiring detailed explanation
-- Elaborate thoroughly - avoid simple yes/no answers
-- Do not reference specific document names, file sources, or business entity names
-- Answer as a knowledgeable sales professional would
-- If information is insufficient, state "Based on available information, I cannot provide a complete response to this requirement" rather than fabricating details
-- Focus on capabilities and solutions rather than documentation references
+Writing style guidelines:
+- Write as if you're speaking directly to the client in person
+- Use natural, conversational language 
+- Avoid AI phrases like "Here's my response", "Summary:", "Detailed Explanation:", or markdown formatting
+- Don't use bullet points, asterisks, or structured formatting
+- Write in flowing paragraphs like a human would speak
+- Be confident and direct about capabilities
+- If you don't have specific information, acknowledge it naturally rather than saying you "cannot provide a complete response"
 
-Context:
-{context}
+Based on this information: {context}
 
-Requirement: {query}
+Client Question: {query}
 
-Response:"""
+Your response:"""
 
         try:
             response = requests.post(
@@ -67,18 +66,58 @@ Response:"""
                     "prompt": prompt,
                     "stream": False,
                     "options": {
-                        "temperature": 0.3,
-                        "top_p": 0.9
+                        "temperature": 0.5,
+                        "top_p": 0.8
                     }
                 },
                 timeout=60
             )
             response.raise_for_status()
-            return response.json()["response"]
+            raw_response = response.json()["response"]
+            # Clean up any AI-like formatting that might remain
+            cleaned_response = self._humanize_response(raw_response)
+            return cleaned_response
         except requests.exceptions.RequestException as e:
             return f"Error connecting to Ollama: {e}"
         except KeyError:
             return "Error: Invalid response from Ollama"
+    
+    def _humanize_response(self, response: str) -> str:
+        """Clean up AI-like formatting to make responses sound more human"""
+        import re
+        
+        # Remove common AI phrases and patterns
+        ai_patterns = [
+            r"Here's my response:\s*",
+            r"Here's a.*?response:\s*",
+            r"Based on.*?information,?\s*",
+            r"Let me.*?:\s*",
+            r"\*\*Summary:\*\*\s*",
+            r"\*\*Detailed Explanation:\*\*\s*",
+            r"\*\*.*?\*\*\s*",  # Remove any bold markdown
+            r"^Summary:\s*",
+            r"^Detailed Explanation:\s*",
+            r"^Response:\s*",
+            r"^Answer:\s*",
+        ]
+        
+        cleaned = response
+        for pattern in ai_patterns:
+            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
+        
+        # Remove bullet points and convert to flowing text
+        cleaned = re.sub(r"^\s*[-•*]\s*", "", cleaned, flags=re.MULTILINE)
+        
+        # Remove excessive line breaks and normalize spacing
+        cleaned = re.sub(r"\n\s*\n\s*\n", "\n\n", cleaned)
+        cleaned = re.sub(r"^\s+", "", cleaned)
+        cleaned = re.sub(r"\s+$", "", cleaned)
+        
+        # Remove markdown-style formatting
+        cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)  # Bold
+        cleaned = re.sub(r"\*(.*?)\*", r"\1", cleaned)      # Italic
+        
+        return cleaned.strip()
     
     def ask(self, query: str, top_k: int = 3) -> dict:
         """Complete RAG pipeline: retrieve + generate"""
@@ -96,6 +135,38 @@ Response:"""
             "context": context,
             "answer": answer
         }
+    
+    def process_requirements_batch(self, requirements: list, top_k: int = 3, progress_callback=None) -> list:
+        """Process multiple requirements in batch"""
+        results = []
+        total_requirements = len(requirements)
+        
+        print(f"Processing {total_requirements} requirements...")
+        
+        for i, requirement in enumerate(requirements):
+            print(f"Processing requirement {i+1}/{total_requirements}")
+            
+            try:
+                result = self.ask(requirement, top_k)
+                results.append({
+                    "requirement": requirement,
+                    "response": result["answer"],
+                    "status": "success"
+                })
+            except Exception as e:
+                print(f"Error processing requirement {i+1}: {e}")
+                results.append({
+                    "requirement": requirement,
+                    "response": f"Error processing requirement: {str(e)}",
+                    "status": "error"
+                })
+            
+            # Call progress callback if provided (for Streamlit progress bar)
+            if progress_callback:
+                progress_callback(i + 1, total_requirements)
+        
+        print(f"Completed processing {total_requirements} requirements")
+        return results
 
 def main():
     # Initialize RAG pipeline

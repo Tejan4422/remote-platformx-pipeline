@@ -6,74 +6,110 @@ This project is a local implementation of a Retrieval-Augmented Generation (RAG)
 
 ## Project Structure
 
+# RFP Response Generator
+
+An intelligent system that extracts requirements from RFP documents and generates professional responses using Retrieval-Augmented Generation (RAG) with local language models.
+
+## Features
+
+- **📄 Document Processing**: Upload PDF/DOCX files containing RFP requirements
+- **🧠 Intelligent Extraction**: Automatically extract individual requirements from documents
+- **🔍 RAG Pipeline**: Use your knowledge base to generate contextual responses
+- **📊 Multiple Output Formats**: Export results as Excel, PDF, or CSV
+- **🎛️ Interactive Interface**: User-friendly Streamlit web interface
+- **⚡ Batch Processing**: Process multiple requirements efficiently
+
+## System Architecture
+
 ```
-local-rag-app
-├── src
-│   ├── ingestion          # Module for data ingestion
-│   │   ├── __init__.py
-│   │   ├── excel_loader.py # Functions to load data from Excel files
-│   │   └── document_processor.py # Handles text extraction and chunking
-│   ├── retrieval          # Module for data retrieval
-│   │   ├── __init__.py
-│   │   ├── embeddings.py   # Functions for embedding text using OpenAI API
-│   │   ├── vector_store.py  # Manages storage and retrieval of embeddings
-│   │   └── openai_client.py # Interacts with the OpenAI API
-│   ├── app                # Streamlit application
-│   │   ├── __init__.py
-│   │   ├── streamlit_app.py # Streamlit app code
-│   │   └── utils.py        # Utility functions for the app
-│   └── config             # Configuration settings
-│       ├── __init__.py
-│       └── settings.py     # API keys and constants
-├── data                   # Data directories
-│   ├── processed          # Processed data files
-│   └── raw                # Raw data files
-├── tests                  # Unit tests
-│   ├── __init__.py
-│   ├── test_ingestion.py  # Tests for ingestion module
-│   └── test_retrieval.py  # Tests for retrieval module
-├── requirements.txt       # Project dependencies
-├── .env                   # Environment variables
-├── .gitignore             # Git ignore file
-└── README.md              # Project documentation
+RFP Document → Requirement Extraction → RAG Processing → Response Generation → Output Files
+     ↓                    ↓                   ↓                    ↓               ↓
+   PDF/DOCX         Pattern Matching    Vector Search      Ollama LLM        Excel/PDF/CSV
 ```
 
-## Setup Instructions
+## Installation
 
-1. **Clone the repository:**
+1. **Clone the repository**
+2. **Install dependencies**:
    ```bash
-   git clone <repository-url>
-   cd local-rag-app
+   pip3 install -r requirements.txt
    ```
 
-2. **Create a virtual environment:**
+3. **Install Ollama** (if not already installed):
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up environment variables:**
-   Create a `.env` file in the root directory and add your API keys and other configuration settings.
-
-5. **Run the Streamlit app:**
-   ```bash
-   streamlit run src/app/streamlit_app.py
+   # On macOS
+   brew install ollama
+   
+   # Start Ollama service
+   ollama serve
+   
+   # Pull a model (e.g., llama3)
+   ollama pull llama3
    ```
 
 ## Usage
 
-- Upload documents through the Streamlit interface.
-- The application will process the documents and allow you to query relevant information using the OpenAI API.
+### Running the Streamlit Application
 
-## Contributing
+```bash
+streamlit run src/app/streamlit_app.py
+```
 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
+Then navigate to `http://localhost:8501` in your web browser.
 
-## License
+### Workflow
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+1. **Upload & Extract** tab:
+   - Upload your RFP document (PDF or DOCX)
+   - Review automatically extracted requirements
+   - Edit requirements if needed
+
+2. **Build Knowledge Base** tab:
+   - Upload documents containing information to answer requirements
+   - Build vector store for RAG retrieval
+
+3. **Generate Responses** tab:
+   - Configure RAG parameters (context chunks, model)
+   - Generate responses for all requirements
+   - Review generated responses
+
+4. **Download Results** tab:
+   - Export results in Excel, PDF, or CSV format
+   - Download files for submission or review
+
+## System Components
+
+### Core Modules
+
+- **`requirement_extractor.py`**: Extracts requirements from documents
+- **`rag_pipeline.py`**: Main RAG processing pipeline
+- **`output_generator.py`**: Excel and CSV generation
+- **`pdf_generator.py`**: PDF report generation
+- **`streamlit_app.py`**: Web interface
+
+### Supporting Modules
+
+- **`document_processor.py`**: Text extraction and chunking
+- **`embeddings.py`**: Text embedding generation
+- **`vector_store.py`**: FAISS vector storage
+
+## Testing
+
+Run the test suite:
+
+```bash
+python3 test_system.py
+```
+
+## Dependencies
+
+- **streamlit**: Web interface
+- **pandas**: Data manipulation
+- **PyPDF2**: PDF processing
+- **python-docx**: DOCX processing
+- **sentence-transformers**: Text embeddings
+- **faiss-cpu**: Vector similarity search
+- **requests**: Ollama API communication
+- **openpyxl**: Excel file generation
+- **reportlab**: PDF generation
+
