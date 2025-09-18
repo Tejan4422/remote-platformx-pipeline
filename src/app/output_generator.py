@@ -171,4 +171,74 @@ class OutputGenerator:
         
         # Create DataFrame and convert to CSV bytes
         df = pd.DataFrame(data)
-        return df.to_csv(index=False).encode('utf-8')
+    def generate_structured_excel_bytes(self, results: List[Dict], original_df: pd.DataFrame, 
+                                       requirement_column: str) -> bytes:
+        """Generate Excel file preserving original structure with added response column"""
+        # Create a copy of the original dataframe
+        output_df = original_df.copy()
+        
+        # Create a mapping of requirements to responses
+        response_map = {result["requirement"]: result["response"] for result in results}
+        
+        # Add response column
+        responses = []
+        for _, row in output_df.iterrows():
+            requirement = str(row[requirement_column]).strip()
+            response = response_map.get(requirement, "No response generated")
+            responses.append(response)
+        
+        output_df['Response'] = responses
+        
+        # Add status column
+        statuses = []
+        for _, row in output_df.iterrows():
+            requirement = str(row[requirement_column]).strip()
+            status = next((result["status"] for result in results 
+                          if result["requirement"] == requirement), "unknown")
+            statuses.append(status)
+        
+        output_df['Status'] = statuses
+        
+        # Create Excel file in memory
+        output = io.BytesIO()
+        
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            output_df.to_excel(writer, sheet_name='RFP Responses', index=False)
+            
+            # Get the workbook and worksheet objects
+            workbook = writer.book
+            worksheet = writer.sheets['RFP Responses']
+            
+            # Auto-adjust column widths
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                
+                # Set reasonable column widths
+                if column_letter in ['A', 'B', 'C']:  # First few columns
+                    adjusted_width = min(max_length + 2, 30)
+                else:  # Response and status columns
+                    adjusted_width = min(max_length + 2, 100)
+                
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+            
+            # Enable text wrapping for response column
+            from openpyxl.styles import Alignment
+            wrap_alignment = Alignment(wrap_text=True, vertical='top')
+            
+            # Find response column (should be second to last)
+            response_col_idx = len(output_df.columns) - 1  # -1 for Response, -2 would be Status
+            
+            for row in worksheet.iter_rows(min_row=2):  # Skip header row
+                if len(row) > response_col_idx:
+                    row[response_col_idx - 1].alignment = wrap_alignment  # Response column
+        
+        output.seek(0)
+        return output.getvalue()
