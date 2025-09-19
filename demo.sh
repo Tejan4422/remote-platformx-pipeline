@@ -70,7 +70,7 @@ if [ $? -eq 0 ]; then
     echo ""
     
     # Start Streamlit with simplified app
-    streamlit run src/app/streamlit_app.py
+    python3 -m streamlit run src/app/streamlit_app.py
 else
     echo "❌ Tests failed. Please check the error messages above."
     exit 1

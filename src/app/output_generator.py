@@ -161,44 +161,7 @@ class OutputGenerator:
         
         output.seek(0)
         return output.getvalue()
-    
-    def generate_csv(self, results: List[Dict], filename: str = None) -> str:
-        """Generate CSV file with requirements and responses"""
-        if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"rfp_responses_{timestamp}.csv"
-        
-        # Prepare data for DataFrame
-        data = []
-        for i, result in enumerate(results, 1):
-            data.append({
-                "ID": i,
-                "Requirement": result["requirement"],
-                "Response": result["response"],
-                "Status": result.get("status", "success")
-            })
-        
-        # Create DataFrame and save as CSV
-        df = pd.DataFrame(data)
-        output_path = self.output_dir / filename
-        df.to_csv(output_path, index=False)
-        
-        return str(output_path)
-    
-    def generate_csv_bytes(self, results: List[Dict]) -> bytes:
-        """Generate CSV file as bytes for Streamlit download"""
-        # Prepare data for DataFrame
-        data = []
-        for i, result in enumerate(results, 1):
-            data.append({
-                "ID": i,
-                "Requirement": result["requirement"],
-                "Response": result["response"],
-                "Status": result.get("status", "success")
-            })
-        
-        # Create DataFrame and convert to CSV bytes
-        df = pd.DataFrame(data)
+
     def generate_structured_excel_bytes(self, results: List[Dict], original_df: pd.DataFrame, 
                                        requirement_column: str) -> bytes:
         """Generate Excel file preserving original structure with added response column"""
