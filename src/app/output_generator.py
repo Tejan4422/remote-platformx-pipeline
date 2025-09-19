@@ -20,12 +20,26 @@ class OutputGenerator:
         # Prepare data for DataFrame
         data = []
         for i, result in enumerate(results, 1):
-            data.append({
+            row_data = {
                 "ID": i,
                 "Requirement": result["requirement"],
                 "Response": result["response"],
                 "Status": result.get("status", "success")
-            })
+            }
+            
+            # Add quality scores if available
+            if result.get("quality_score") is not None:
+                row_data.update({
+                    "Quality Score": result["quality_score"],
+                    "Quality Status": result.get("quality_status", "Unknown"),
+                    "Completeness": result.get("quality_breakdown", {}).get("completeness", ""),
+                    "Clarity": result.get("quality_breakdown", {}).get("clarity", ""),
+                    "Professionalism": result.get("quality_breakdown", {}).get("professionalism", ""),
+                    "Relevance": result.get("quality_breakdown", {}).get("relevance", ""),
+                    "Quality Feedback": "; ".join(result.get("quality_feedback", []))
+                })
+            
+            data.append(row_data)
         
         # Create DataFrame
         df = pd.DataFrame(data)
@@ -79,12 +93,26 @@ class OutputGenerator:
         # Prepare data for DataFrame
         data = []
         for i, result in enumerate(results, 1):
-            data.append({
+            row_data = {
                 "ID": i,
                 "Requirement": result["requirement"],
                 "Response": result["response"],
                 "Status": result.get("status", "success")
-            })
+            }
+            
+            # Add quality scores if available
+            if result.get("quality_score") is not None:
+                row_data.update({
+                    "Quality Score": result["quality_score"],
+                    "Quality Status": result.get("quality_status", "Unknown"),
+                    "Completeness": result.get("quality_breakdown", {}).get("completeness", ""),
+                    "Clarity": result.get("quality_breakdown", {}).get("clarity", ""),
+                    "Professionalism": result.get("quality_breakdown", {}).get("professionalism", ""),
+                    "Relevance": result.get("quality_breakdown", {}).get("relevance", ""),
+                    "Quality Feedback": "; ".join(result.get("quality_feedback", []))
+                })
+            
+            data.append(row_data)
         
         # Create DataFrame
         df = pd.DataFrame(data)

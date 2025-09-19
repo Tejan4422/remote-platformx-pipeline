@@ -8,6 +8,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.retrieval.embeddings import embed_text
 from src.vector_store.vector_store import FAISSStore
+from app.quality_scorer import RFPQualityScorer
 
 class RAGPipeline:
     def __init__(self, store_dir="test_store", ollama_url="http://localhost:11434", model="llama3"):
@@ -15,6 +16,7 @@ class RAGPipeline:
         self.ollama_url = ollama_url
         self.model = model
         self.vector_store = None
+        self.quality_scorer = RFPQualityScorer()
         
     def load_vector_store(self):
         """Load the vector store"""
@@ -119,8 +121,8 @@ Your response:"""
         
         return cleaned.strip()
     
-    def ask(self, query: str, top_k: int = 3) -> dict:
-        """Complete RAG pipeline: retrieve + generate"""
+    def ask(self, query: str, top_k: int = 3, include_quality_score: bool = True) -> dict:
+        """Complete RAG pipeline: retrieve + generate + score quality"""
         print(f"Query: {query}")
         
         # Step 1: Retrieve relevant context
@@ -130,11 +132,32 @@ Your response:"""
         # Step 2: Generate answer
         answer = self.generate_answer(query, context)
         
-        return {
+        # Step 3: Score response quality (if enabled)
+        quality_score = None
+        if include_quality_score:
+            quality_score = self.quality_scorer.score_response(query, answer)
+            print(f"Quality Score: {quality_score.overall_score}/100 ({quality_score.status})")
+        
+        result = {
             "query": query,
             "context": context,
             "answer": answer
         }
+        
+        if quality_score:
+            result.update({
+                "quality_score": quality_score.overall_score,
+                "quality_status": quality_score.status,
+                "quality_breakdown": {
+                    "completeness": quality_score.completeness,
+                    "clarity": quality_score.clarity,
+                    "professionalism": quality_score.professionalism,
+                    "relevance": quality_score.relevance
+                },
+                "quality_feedback": quality_score.feedback
+            })
+        
+        return result
     
     def process_requirements_batch(self, requirements: list, top_k: int = 3, progress_callback=None) -> list:
         """Process multiple requirements in batch"""
