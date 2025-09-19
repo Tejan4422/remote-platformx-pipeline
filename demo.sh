@@ -64,7 +64,7 @@ if [ $? -eq 0 ]; then
     echo "   1. Upload RFP document → Extract requirements"
     echo "   2. Review and edit requirements if needed"
     echo "   3. Generate responses using existing knowledge base"
-    echo "   4. Download Excel/PDF/CSV files with results"
+    echo "   4. Download Excel/PDF files with results"
     echo ""
     echo "💡 The system uses your pre-built knowledge base in test_store/"
     echo ""
