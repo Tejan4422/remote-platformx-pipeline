@@ -45,7 +45,11 @@ def process_requirements_batch(requirements, rag, top_k, ollama_model, start_ind
             batch_results.append({
                 "requirement": requirement,
                 "response": result["answer"],
-                "status": "success"
+                "status": "success",
+                "quality_score": result.get("quality_score", 0),
+                "quality_status": result.get("quality_status", "Unknown"),
+                "quality_breakdown": result.get("quality_breakdown", {}),
+                "quality_feedback": result.get("quality_feedback", [])
             })
             
             # Update progress
@@ -431,7 +435,11 @@ def main():
                         results.append({
                             "requirement": requirement,
                             "response": result["answer"],
-                            "status": "success"
+                            "status": "success",
+                            "quality_score": result.get("quality_score", 0),
+                            "quality_status": result.get("quality_status", "Unknown"),
+                            "quality_breakdown": result.get("quality_breakdown", {}),
+                            "quality_feedback": result.get("quality_feedback", [])
                         })
                         
                         # Update progress
@@ -465,17 +473,77 @@ def main():
                             # Show all if 5 or fewer
                             for i, result in enumerate(results, 1):
                                 with st.container():
-                                    st.markdown(f"**{i}. {result['requirement'][:100]}{'...' if len(result['requirement']) > 100 else ''}**")
-                                    with st.expander("View Response", expanded=False):
+                                    # Header with quality indicator
+                                    quality_emoji = "🌟" if result.get("quality_status") == "Excellent" else "✅" if result.get("quality_status") == "Good" else "⚠️" if result.get("quality_status") == "Needs Review" else "❌"
+                                    quality_score = result.get("quality_score", 0)
+                                    
+                                    col1, col2 = st.columns([4, 1])
+                                    with col1:
+                                        st.markdown(f"**{i}. {result['requirement'][:100]}{'...' if len(result['requirement']) > 100 else ''}**")
+                                    with col2:
+                                        st.markdown(f"{quality_emoji} **{quality_score:.0f}/100**")
+                                    
+                                    with st.expander("View Response & Quality Details", expanded=False):
                                         st.write(result['response'])
+                                        
+                                        # Quality breakdown
+                                        if result.get("quality_breakdown"):
+                                            st.markdown("**Quality Breakdown:**")
+                                            breakdown = result["quality_breakdown"]
+                                            q_col1, q_col2, q_col3, q_col4 = st.columns(4)
+                                            with q_col1:
+                                                st.metric("Completeness", f"{breakdown.get('completeness', 0):.0f}")
+                                            with q_col2:
+                                                st.metric("Clarity", f"{breakdown.get('clarity', 0):.0f}")
+                                            with q_col3:
+                                                st.metric("Professional", f"{breakdown.get('professionalism', 0):.0f}")
+                                            with q_col4:
+                                                st.metric("Relevance", f"{breakdown.get('relevance', 0):.0f}")
+                                            
+                                            # Quality feedback
+                                            if result.get("quality_feedback"):
+                                                st.markdown("**Improvement Suggestions:**")
+                                                for feedback in result["quality_feedback"]:
+                                                    st.info(f"💡 {feedback}")
+                                    
                                     st.markdown("---")
                         else:
                             # Show first 3 and provide summary for larger sets
                             for i, result in enumerate(results[:3], 1):
                                 with st.container():
-                                    st.markdown(f"**{i}. {result['requirement'][:100]}{'...' if len(result['requirement']) > 100 else ''}**")
-                                    with st.expander("View Response", expanded=False):
+                                    # Header with quality indicator
+                                    quality_emoji = "🌟" if result.get("quality_status") == "Excellent" else "✅" if result.get("quality_status") == "Good" else "⚠️" if result.get("quality_status") == "Needs Review" else "❌"
+                                    quality_score = result.get("quality_score", 0)
+                                    
+                                    col1, col2 = st.columns([4, 1])
+                                    with col1:
+                                        st.markdown(f"**{i}. {result['requirement'][:100]}{'...' if len(result['requirement']) > 100 else ''}**")
+                                    with col2:
+                                        st.markdown(f"{quality_emoji} **{quality_score:.0f}/100**")
+                                    
+                                    with st.expander("View Response & Quality Details", expanded=False):
                                         st.write(result['response'])
+                                        
+                                        # Quality breakdown
+                                        if result.get("quality_breakdown"):
+                                            st.markdown("**Quality Breakdown:**")
+                                            breakdown = result["quality_breakdown"]
+                                            q_col1, q_col2, q_col3, q_col4 = st.columns(4)
+                                            with q_col1:
+                                                st.metric("Completeness", f"{breakdown.get('completeness', 0):.0f}")
+                                            with q_col2:
+                                                st.metric("Clarity", f"{breakdown.get('clarity', 0):.0f}")
+                                            with q_col3:
+                                                st.metric("Professional", f"{breakdown.get('professionalism', 0):.0f}")
+                                            with q_col4:
+                                                st.metric("Relevance", f"{breakdown.get('relevance', 0):.0f}")
+                                            
+                                            # Quality feedback
+                                            if result.get("quality_feedback"):
+                                                st.markdown("**Improvement Suggestions:**")
+                                                for feedback in result["quality_feedback"]:
+                                                    st.info(f"💡 {feedback}")
+                                    
                                     st.markdown("---")
                             
                             st.info(f"📊 Showing first 3 of {len(results)} responses. Download the complete results below to see all responses.")
@@ -606,6 +674,26 @@ def main():
         # Responses status
         if st.session_state.responses:
             st.success(f"✅ {len(st.session_state.responses)} responses generated")
+            
+            # Quality Summary
+            quality_scores = [resp.get("quality_score", 0) for resp in st.session_state.responses if resp.get("quality_score")]
+            if quality_scores:
+                avg_quality = sum(quality_scores) / len(quality_scores)
+                status_counts = {}
+                for resp in st.session_state.responses:
+                    status = resp.get("quality_status", "Unknown")
+                    status_counts[status] = status_counts.get(status, 0) + 1
+                
+                # Quality overview in columns
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("📊 Avg Quality", f"{avg_quality:.1f}/100")
+                with col2:
+                    st.metric("🌟 Excellent", status_counts.get("Excellent", 0))
+                with col3:
+                    st.metric("✅ Good", status_counts.get("Good", 0))
+                with col4:
+                    st.metric("⚠️ Needs Review", status_counts.get("Needs Review", 0) + status_counts.get("Poor", 0))
         else:
             st.info("🔄 Generate responses using RAG pipeline")
         
