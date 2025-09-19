@@ -114,12 +114,12 @@ def main():
     
     # Step 1: Upload RFP Document
     st.header("📄 Step 1: Upload RFP Document")
-    st.markdown("**Supported formats:** PDF, DOCX, Excel (XLSX/XLS), CSV")
+    st.markdown("**Supported formats:** PDF, DOCX, Excel (XLSX/XLS)")
     
     rfp_file = st.file_uploader(
         "Upload your RFP document containing requirements", 
-        type=['pdf', 'docx', 'xlsx', 'xls', 'csv'],
-        help="Upload a PDF, DOCX, Excel (XLSX/XLS), or CSV file containing the RFP requirements you want to respond to.",
+        type=['pdf', 'docx', 'xlsx', 'xls'],
+        help="Upload a PDF, DOCX, or Excel (XLSX/XLS) file containing the RFP requirements you want to respond to.",
         key="rfp_uploader"
     )
     
@@ -129,7 +129,7 @@ def main():
         **PDF/DOCX Files:**
         - Should contain numbered questions/requirements (1., 2., G1:, A1:, etc.)
         
-        **Excel/CSV Files:**
+        **Excel Files:**
         - Should have a column containing requirements/questions
         - Supported column names: Requirements, Questions, Queries, Items, Tasks, etc.
         - Example:
@@ -189,8 +189,8 @@ def main():
                     from ingestion.requirement_extractor import RequirementExtractor
                     extractor = RequirementExtractor()
                     
-                    # Check if it's a structured file (Excel/CSV)
-                    if temp_path.lower().endswith(('.xlsx', '.xls', '.csv')):
+                    # Check if it's a structured file (Excel)
+                    if temp_path.lower().endswith(('.xlsx', '.xls')):
                         # Use metadata extraction for structured files
                         extraction_result = extractor.extract_with_metadata(temp_path)
                         requirements = extraction_result['requirements']
@@ -213,7 +213,7 @@ def main():
                         st.warning("⚠️ No requirements found. Please try uploading a different document or check the file content.")
                         
                         # Show debugging info for structured files
-                        if temp_path.lower().endswith(('.xlsx', '.xls', '.csv')):
+                        if temp_path.lower().endswith(('.xlsx', '.xls')):
                             st.write("**Available columns in your file:**")
                             if 'extraction_metadata' in st.session_state and 'dataframe' in st.session_state.extraction_metadata:
                                 df = st.session_state.extraction_metadata['dataframe']
@@ -577,7 +577,7 @@ def main():
         
         st.success(f"Ready to download results for {len(st.session_state.responses)} requirements!")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         
         with col1:
             st.subheader("📊 Excel Format")
@@ -632,24 +632,6 @@ def main():
                 )
             except Exception as e:
                 st.error(f"Error generating PDF: {str(e)}")
-        
-        with col3:
-            st.subheader("📋 CSV Format")
-            try:
-                output_gen = OutputGenerator()
-                csv_bytes = output_gen.generate_csv_bytes(st.session_state.responses)
-                
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"rfp_responses_{timestamp}.csv"
-                
-                st.download_button(
-                    label="⬇️ Download CSV",
-                    data=csv_bytes,
-                    file_name=filename,
-                    mime="text/csv"
-                )
-            except Exception as e:
-                st.error(f"Error generating CSV: {str(e)}")
     
     # Sidebar with status and help
     with st.sidebar:
@@ -713,7 +695,7 @@ def main():
         st.markdown("---")
         st.markdown("## 💡 Tips")
         st.markdown("""
-        - **Excel/CSV files:** Make sure requirements are in a clear column
+        - **Excel files:** Make sure requirements are in a clear column
         - **PDF files:** Use numbered questions (1., 2., G1:, etc.)
         - **Vector store:** Pre-built knowledge base will be used if available
         - **Models:** Start with llama3 for best results
