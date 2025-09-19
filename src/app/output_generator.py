@@ -171,12 +171,26 @@ class OutputGenerator:
         # Prepare data for DataFrame
         data = []
         for i, result in enumerate(results, 1):
-            data.append({
+            row_data = {
                 "ID": i,
                 "Requirement": result["requirement"],
                 "Response": result["response"],
                 "Status": result.get("status", "success")
-            })
+            }
+            
+            # Add quality scores if available
+            if result.get("quality_score") is not None:
+                row_data.update({
+                    "Quality Score": result["quality_score"],
+                    "Quality Status": result.get("quality_status", "Unknown"),
+                    "Completeness": result.get("quality_breakdown", {}).get("completeness", ""),
+                    "Clarity": result.get("quality_breakdown", {}).get("clarity", ""),
+                    "Professionalism": result.get("quality_breakdown", {}).get("professionalism", ""),
+                    "Relevance": result.get("quality_breakdown", {}).get("relevance", ""),
+                    "Quality Feedback": "; ".join(result.get("quality_feedback", []))
+                })
+            
+            data.append(row_data)
         
         # Create DataFrame and save as CSV
         df = pd.DataFrame(data)
@@ -190,15 +204,33 @@ class OutputGenerator:
         # Prepare data for DataFrame
         data = []
         for i, result in enumerate(results, 1):
-            data.append({
+            row_data = {
                 "ID": i,
                 "Requirement": result["requirement"],
                 "Response": result["response"],
                 "Status": result.get("status", "success")
-            })
+            }
+            
+            # Add quality scores if available
+            if result.get("quality_score") is not None:
+                row_data.update({
+                    "Quality Score": result["quality_score"],
+                    "Quality Status": result.get("quality_status", "Unknown"),
+                    "Completeness": result.get("quality_breakdown", {}).get("completeness", ""),
+                    "Clarity": result.get("quality_breakdown", {}).get("clarity", ""),
+                    "Professionalism": result.get("quality_breakdown", {}).get("professionalism", ""),
+                    "Relevance": result.get("quality_breakdown", {}).get("relevance", ""),
+                    "Quality Feedback": "; ".join(result.get("quality_feedback", []))
+                })
+            
+            data.append(row_data)
         
         # Create DataFrame and convert to CSV bytes
         df = pd.DataFrame(data)
+        output = io.StringIO()
+        df.to_csv(output, index=False)
+        return output.getvalue().encode('utf-8')
+
     def generate_structured_excel_bytes(self, results: List[Dict], original_df: pd.DataFrame, 
                                        requirement_column: str) -> bytes:
         """Generate Excel file preserving original structure with added response column"""
