@@ -87,11 +87,12 @@ def generate_proposal_section():
         section_info = template.get_section_info(selected_section)
         st.metric("Typical Length", section_info['typical_length'])
     
-    # Show section details
-    with st.expander("📋 Section Details", expanded=False):
+    # Show section details in a user-friendly way
+    with st.expander("� About This Section Type", expanded=False):
         st.markdown(f"**Purpose**: {section_info['purpose']}")
-        st.markdown(f"**Description**: {section_info['description']}")
-        st.markdown(f"**Key Elements**: {', '.join(section_info['key_elements'])}")
+        st.markdown(f"**What it covers**: {section_info['description']}")
+        st.markdown(f"**Typical length**: {section_info['typical_length']}")
+        st.markdown(f"**Key elements included**: {', '.join(section_info['key_elements'])}")
     
     # Input form
     st.subheader("📝 Project Requirements")
@@ -222,74 +223,106 @@ def display_generated_content():
     with col3:
         st.metric("Generated At", content_data['timestamp'].strftime("%H:%M:%S"))
     
-    # Generated prompt (what would be sent to LLM)
-    with st.expander("📝 Generated Prompt (sent to AI)", expanded=True):
-        st.markdown("**This is the prompt that would be sent to the LLM:**")
+    # Generated prompt (what would be sent to LLM) - Hidden by default
+    with st.expander("� Advanced: View AI Prompt (for debugging)", expanded=False):
+        st.markdown("**Technical Details**: This shows the internal prompt sent to the AI model")
         st.text_area(
-            "LLM Prompt",
+            "LLM Prompt (Internal)",
             value=result.get('prompt', 'No prompt available'),
-            height=400,
-            help="This prompt will be sent to your local LLM (Ollama) for content generation"
+            height=300,
+            help="This is the internal prompt sent to your local LLM (Ollama) - for technical debugging only",
+            disabled=True
         )
     
-    # Requirements used
-    with st.expander("📋 Requirements Used"):
+    # Requirements used - Collapsed by default
+    with st.expander("📋 Generation Settings Used", expanded=False):
         st.json(requirements)
     
-    # Style rules
-    with st.expander("🎨 Style Rules Applied"):
+    # Style rules - Hidden by default
+    with st.expander("🎨 Style Guidelines Applied", expanded=False):
+        st.markdown("**Note**: These style rules ensure consistent, professional output")
         st.json(result.get('style_rules', {}))
     
-    # Simulate LLM Response
-    st.subheader("🤖 Simulated AI Response")
-    st.info("💡 **Note**: This is where the actual generated content would appear when integrated with your LLM")
+    # Simulate LLM Response - This is the main focus
+    st.subheader("📝 Generated Content")
+    st.info("💡 **Note**: This shows what the AI would generate when integrated with your LLM")
     
     # Example response based on section type
     example_response = get_example_response(result['section_type'], requirements)
     
-    st.text_area(
-        "Generated Content (Example)",
-        value=example_response,
-        height=300,
-        help="This is an example of what the AI would generate"
-    )
+    # Show the generated content prominently
+    st.markdown("### Generated Proposal Section:")
+    st.markdown(f"**{result['section_type'].replace('_', ' ').title()}**")
+    
+    # Display in a nice format
+    st.markdown("---")
+    st.markdown(example_response)
+    st.markdown("---")
+    
+    # Quality Assessment - Make this prominent
+    st.subheader("📊 Content Quality Assessment")
     
     # Validation simulation
     template = st.session_state.proposal_template
     validation = template.validate_output(example_response, result['section_type'])
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         score_color = "green" if validation['score'] >= 80 else "orange" if validation['score'] >= 60 else "red"
-        st.markdown(f"### Quality Score: :{score_color}[{validation['score']}/100]")
+        st.metric("Quality Score", f"{validation['score']}/100", delta=None)
+        if validation['score'] >= 80:
+            st.success("✅ Excellent quality")
+        elif validation['score'] >= 60:
+            st.warning("⚠️ Good, with room for improvement")
+        else:
+            st.error("❌ Needs significant improvement")
     
     with col2:
         status_icon = "✅" if validation['valid'] else "⚠️"
-        st.markdown(f"### Status: {status_icon} {'Valid' if validation['valid'] else 'Needs Review'}")
+        st.metric("Status", f"{'Valid' if validation['valid'] else 'Needs Review'}")
     
-    if validation['issues']:
-        st.subheader("⚠️ Issues Found")
-        for issue in validation['issues']:
-            st.warning(f"• {issue}")
+    with col3:
+        word_count = len(example_response.split())
+        st.metric("Word Count", f"{word_count} words")
     
-    if validation['suggestions']:
-        st.subheader("💡 Improvement Suggestions")
-        for suggestion in validation['suggestions']:
-            st.info(f"• {suggestion}")
+    # Show issues and suggestions if any
+    if validation['issues'] or validation['suggestions']:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if validation['issues']:
+                st.markdown("**⚠️ Issues to Address:**")
+                for issue in validation['issues']:
+                    st.warning(f"• {issue}")
+        
+        with col2:
+            if validation['suggestions']:
+                st.markdown("**💡 Improvement Suggestions:**")
+                for suggestion in validation['suggestions']:
+                    st.info(f"• {suggestion}")
     
     # Actions
     st.subheader("🔧 Actions")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         if st.button("🔄 Regenerate"):
             st.experimental_rerun()
     
     with col2:
-        if st.button("📋 Copy Prompt"):
-            st.code(result.get('prompt', ''), language='text')
+        if st.button("📋 Copy Content"):
+            st.code(example_response, language='text')
     
     with col3:
+        if st.button("📤 Export"):
+            st.download_button(
+                "📄 Download as Text",
+                data=example_response,
+                file_name=f"{result['section_type']}_proposal.txt",
+                mime="text/plain"
+            )
+    
+    with col4:
         if st.button("🗑️ Clear"):
             st.session_state.generated_content = None
             st.experimental_rerun()
