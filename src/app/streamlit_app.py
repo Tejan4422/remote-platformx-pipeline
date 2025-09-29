@@ -98,7 +98,7 @@ def main():
     )
     
     st.title("🔍 RFP Response Generator")
-    st.markdown("Upload your RFP document and knowledge base, then generate professional responses automatically!")
+    st.markdown("Upload your RFP document to extract requirements, then generate professional responses using our organizational knowledge base!")
     
     # Initialize session state
     if 'requirements' not in st.session_state:
@@ -107,10 +107,6 @@ def main():
         st.session_state.responses = []
     if 'vector_store_ready' not in st.session_state:
         st.session_state.vector_store_ready = False
-    if 'knowledge_docs_processed' not in st.session_state:
-        st.session_state.knowledge_docs_processed = False
-    if 'show_knowledge_upload' not in st.session_state:
-        st.session_state.show_knowledge_upload = False
     
     # Step 1: Upload RFP Document
     st.header("📄 Step 1: Upload RFP Document")
@@ -264,20 +260,15 @@ def main():
                 with st.expander(f"Requirement {i}", expanded=False):
                     st.write(req)
     
-    # Step 2: Upload Knowledge Base OR Use Existing Vector Store
+    # Check Vector Store Status
     if st.session_state.requirements:
-        st.header("🧠 Step 2: Knowledge Base Setup")
-        
-        # Check if vector store already exists
+        # Check if vector store exists
         vector_store_exists = Path("test_store/index.faiss").exists() and Path("test_store/docstore.pkl").exists()
         
         if vector_store_exists:
-            st.success("✅ Existing vector store found! You can proceed directly to generate responses.")
             st.session_state.vector_store_ready = True
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.info("📊 Using pre-built knowledge base")
+            with st.expander("📊 Vector Store Information", expanded=False):
+                st.success("✅ Using organizational knowledge base")
                 if st.button("🔍 Inspect Vector Store", key="inspect_store"):
                     try:
                         from vector_store.vector_store import FAISSStore
@@ -285,85 +276,13 @@ def main():
                         st.write(f"Vector store contains {len(store.texts)} documents")
                     except Exception as e:
                         st.error(f"Error inspecting vector store: {e}")
-            
-            with col2:
-                st.markdown("**Want to update the knowledge base?**")
-                if st.button("🔄 Upload New Documents", key="show_upload"):
-                    st.session_state.show_knowledge_upload = True
         else:
-            st.warning("⚠️ No existing vector store found. Please upload knowledge base documents.")
-            st.session_state.show_knowledge_upload = True
-        
-        # Show knowledge base upload section if needed
-        if st.session_state.get('show_knowledge_upload', False) or not vector_store_exists:
-            st.markdown("**Upload documents that contain information to answer the RFP requirements.**")
-            
-            knowledge_files = st.file_uploader(
-                "Upload knowledge base documents", 
-                type=['pdf', 'docx'],
-                accept_multiple_files=True,
-                help="Upload documents containing information that will be used to answer the RFP requirements.",
-                key="knowledge_files"
-            )
-            
-            if knowledge_files:
-                if st.button("🔨 Process Knowledge Base", type="primary"):
-                    with st.spinner("Processing documents and building knowledge base..."):
-                        try:
-                            # Create directories
-                            Path("data/raw").mkdir(parents=True, exist_ok=True)
-                            Path("data/processed").mkdir(parents=True, exist_ok=True)
-                            
-                            all_chunks = []
-                            
-                            # Process each uploaded file
-                            progress_bar = st.progress(0)
-                            for idx, uploaded_file in enumerate(knowledge_files):
-                                # Save temporarily
-                                temp_path = Path("data/raw") / uploaded_file.name
-                                with open(temp_path, "wb") as f:
-                                    f.write(uploaded_file.getvalue())
-                                
-                                # Process document
-                                chunks = process_document(str(temp_path))
-                                all_chunks.extend(chunks)
-                                
-                                progress_bar.progress((idx + 1) / len(knowledge_files))
-                                st.success(f"✅ Processed {uploaded_file.name}: {len(chunks)} chunks")
-                            
-                            # Build vector store
-                            st.info("Building vector store...")
-                            
-                            # Import and use existing vector store functionality
-                            from retrieval.embeddings import embed_text
-                            from vector_store.vector_store import FAISSStore
-                            
-                            # Create vector store
-                            vector_store = FAISSStore(dimension=384)  # sentence-transformers dimension
-                            
-                            # Create embeddings and add to vector store
-                            chunk_progress = st.progress(0)
-                            for i, chunk in enumerate(all_chunks):
-                                embedding = embed_text(chunk)
-                                vector_store.add_text(chunk, embedding)
-                                chunk_progress.progress((i + 1) / len(all_chunks))
-                            
-                            # Save vector store
-                            vector_store.save("test_store")
-                            
-                            st.session_state.vector_store_ready = True
-                            st.session_state.knowledge_docs_processed = True
-                            st.session_state.show_knowledge_upload = False
-                            st.success(f"🎉 Knowledge base built successfully with {len(all_chunks)} text chunks!")
-                            st.experimental_rerun()
-                            
-                        except Exception as e:
-                            st.error(f"Error building knowledge base: {str(e)}")
-                            st.exception(e)
+            st.error("⚠️ No organizational vector store found. Please contact your administrator to set up the knowledge base.")
+            st.session_state.vector_store_ready = False
     
-    # Step 3: Generate Responses
+    # Step 2: Generate Responses
     if st.session_state.requirements:
-        st.header("⚡ Step 3: Generate Responses")
+        st.header("⚡ Step 2: Generate Responses")
         
         if st.session_state.vector_store_ready:
             st.success("🚀 Ready to generate responses using RAG pipeline!")
@@ -395,6 +314,9 @@ def main():
                 st.info(f"Will process requirements {start_from} to {start_from + actual_batch_size - 1}")
                 
                 if st.button(f"🚀 Generate Responses (Batch: {start_from}-{start_from + actual_batch_size - 1})", type="primary", key="generate_batch"):
+                    # Initialize RAG pipeline
+                    rag = RAGPipeline(model=ollama_model)
+                    
                     # Process only the selected batch
                     selected_requirements = st.session_state.requirements[start_from-1:start_from-1+actual_batch_size]
                     process_requirements_batch(selected_requirements, rag, top_k, ollama_model, start_from)
@@ -567,13 +489,13 @@ def main():
                     st.error(f"Error generating responses: {str(e)}")
                     st.exception(e)
         else:
-            st.info("📋 Complete Step 2 (Knowledge Base Setup) to enable response generation.")
+            st.info("📋 Please ensure the organizational vector store is set up to enable response generation.")
             if not Path("test_store/index.faiss").exists():
-                st.warning("⚠️ No vector store found. Please upload knowledge base documents in Step 2.")
+                st.error("❌ No vector store found. Contact your administrator to set up the organizational knowledge base.")
     
-    # Step 4: Download Results
+    # Step 3: Download Results
     if st.session_state.responses:
-        st.header("📥 Step 4: Download Results")
+        st.header("📥 Step 3: Download Results")
         
         st.success(f"Ready to download results for {len(st.session_state.responses)} requirements!")
         
@@ -648,8 +570,6 @@ def main():
         if vector_store_exists:
             st.success("✅ Vector store ready")
             st.session_state.vector_store_ready = True
-        elif st.session_state.vector_store_ready:
-            st.success("✅ Knowledge base ready")
         else:
             st.info("🔄 Upload knowledge documents or use existing vector store")
         
@@ -685,8 +605,6 @@ def main():
             st.session_state.requirements = []
             st.session_state.responses = []
             st.session_state.vector_store_ready = False
-            st.session_state.knowledge_docs_processed = False
-            st.session_state.show_knowledge_upload = False
             if 'extraction_metadata' in st.session_state:
                 del st.session_state.extraction_metadata
             st.success("All data cleared!")
@@ -697,7 +615,7 @@ def main():
         st.markdown("""
         - **Excel files:** Make sure requirements are in a clear column
         - **PDF files:** Use numbered questions (1., 2., G1:, etc.)
-        - **Vector store:** Pre-built knowledge base will be used if available
+        - **Vector store:** Organizational knowledge base is used automatically
         - **Models:** Start with llama3 for best results
         """)
 
