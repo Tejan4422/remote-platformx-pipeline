@@ -1,0 +1,64 @@
+{
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 2,
+    "success_rate": 33.33333333333333,
+    "all_passed": false
+  },
+  "individual_results": {
+    "health_check": {
+      "status_code": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "message": "RFP Response Generator API is running",
+        "data": {
+          "timestamp": "2025-10-03T19:11:21.439880",
+          "version": "1.0.0",
+          "status": "healthy"
+        },
+        "session_id": null
+      }
+    },
+    "vector_store_stats_empty": {
+      "status_code": 404,
+      "success": false,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    "index_rfp_responses": {
+      "status_code": 404,
+      "success": false,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    "upload_historical_data": {
+      "status_code": 404,
+      "success": false,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    "vector_store_stats_populated": {
+      "status_code": 404,
+      "success": false,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    "query_after_indexing": {
+      "status_code": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "message": "Query executed successfully",
+        "data": {
+          "query": "What is your approach to project management?",
+          "answer": "Our approach to project management is centered around agile methodologies, which have proven to be highly effective in ensuring timely and successful delivery of projects. We use a weekly sprint structure, with clear milestones tracked and regular communication with stakeholders to ensure everyone is aligned and informed throughout the process. This approach has allowed us to maintain an impressive average on-time delivery rate of 95%, with proactive risk management and contingency planning also playing a key role in minimizing any potential issues that may arise.",
+          "context": "RFP Response #3\n\nRequirement: How do you handle project timeline management?\n\nResponse: We use agile project management methodologies with weekly sprints, clear milestone tracking, and regular stakeholder communication. Our average project delivery rate is 95% on-time with proactive risk management and contingency planning.\n\n---\nThis is a historical RFP response that demonstrates how our organization has addressed similar requirements in the past. The response can be used as reference for generating responses to similar future requirements.\n\nthe  use  of ERP/Accounting software or complete an online application\n\ninteraction?The timeframe for developing an interaction between ERP/accounting software and another system depends on the specific",
+          "quality_score": 86.2,
+          "quality_status": "Excellent",
+          "parameters": {
+            "top_k": 3,
+            "model": "llama3"
+          }
+        },
+        "session_id": null
+      }
+    }
+  }
+}
