@@ -10,6 +10,7 @@ import pandas as pd
 import tempfile
 import os
 import time
+import sys
 from pathlib import Path
 import uuid
 
@@ -412,4 +413,4 @@ def main():
 
 if __name__ == "__main__":
     success = main()
-    exit(0 if success else 1)
+    sys.exit(0 if success else 1)
