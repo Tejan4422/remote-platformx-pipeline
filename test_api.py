@@ -50,6 +50,30 @@ def test_api():
                     response = requests.get(f"{base_url}/api/requirements/{session_id}", timeout=5)
                     print(f"   Status: {response.status_code}")
                     
+                    # Test generate responses endpoint
+                    if response.status_code == 200 and result['requirements']:
+                        print(f"\n4.1. Testing generate responses...")
+                        # Use first 2 requirements for testing
+                        test_requirements = result['requirements'][:2]
+                        generate_data = {
+                            "requirements": test_requirements,
+                            "top_k": 3,
+                            "model": "llama3",
+                            "session_id": session_id
+                        }
+                        response = requests.post(f"{base_url}/api/generate-responses", json=generate_data, timeout=60)
+                        print(f"   Status: {response.status_code}")
+                        if response.status_code == 200:
+                            gen_result = response.json()
+                            print(f"   Generated responses: {gen_result['data']['summary']['successful_responses']}/{gen_result['data']['summary']['total_requirements']}")
+                            
+                            # Test get responses endpoint
+                            print(f"\n4.2. Testing get responses...")
+                            response = requests.get(f"{base_url}/api/responses/{session_id}", timeout=5)
+                            print(f"   Status: {response.status_code}")
+                        else:
+                            print(f"   Error: {response.text}")
+                    
                     # Test cleanup
                     print(f"\n5. Testing session cleanup...")
                     response = requests.delete(f"{base_url}/api/session/{session_id}", timeout=5)
@@ -59,6 +83,22 @@ def test_api():
                     print(f"   Error: {response.text}")
         else:
             print(f"\n3. Skipping file upload test - {test_file_path} not found")
+        
+        # Test direct query endpoint
+        print("\n6. Testing direct query endpoint...")
+        query_data = {
+            "query": "What are the main technical requirements?",
+            "top_k": 3,
+            "model": "llama3"
+        }
+        response = requests.post(f"{base_url}/api/query", json=query_data, timeout=30)
+        print(f"   Status: {response.status_code}")
+        if response.status_code == 200:
+            result = response.json()
+            print(f"   Query: {result['data']['query']}")
+            print(f"   Response: {result['data']['response'][:200]}...")
+        else:
+            print(f"   Response: {response.text}")
         
         print("\n✅ All available tests passed!")
         return True

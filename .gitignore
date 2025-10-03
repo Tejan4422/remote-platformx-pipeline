@@ -13,6 +13,10 @@ venv/
 .vscode/
 .DS_Store
 
+# Temporary uploads and server files
+temp_uploads/
+server.log
+
 # Optional: exclude large data files
 # data/raw/*.pdf
 # data/raw/*.docx

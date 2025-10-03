@@ -236,6 +236,169 @@ async def get_requirements(session_id: str):
         }
     )
 
+# Get generated responses for a session
+@app.get("/api/responses/{session_id}")
+async def get_responses(session_id: str):
+    """Get generated responses for a specific session"""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session_data = sessions[session_id]
+    
+    if 'responses' not in session_data:
+        raise HTTPException(
+            status_code=404, 
+            detail="No responses found for this session. Generate responses first using /api/generate-responses"
+        )
+    
+    responses = session_data['responses']
+    successful_responses = [r for r in responses if r['status'] == 'success']
+    
+    return APIResponse(
+        success=True,
+        message="Responses retrieved successfully",
+        session_id=session_id,
+        data={
+            'responses': responses,
+            'summary': {
+                'total_requirements': len(session_data['requirements']),
+                'total_responses': len(responses),
+                'successful_responses': len(successful_responses),
+                'success_rate': len(successful_responses) / len(responses) * 100 if responses else 0
+            },
+            'generation_info': {
+                'response_generation_time': session_data.get('response_generation_time'),
+                'upload_time': session_data['timestamp']
+            }
+        }
+    )
+
+# Direct query endpoint
+@app.post("/api/query")
+async def direct_query(request: QueryRequest):
+    """
+    Direct query endpoint - Query the vector store directly
+    """
+    try:
+        # Initialize RAG pipeline
+        rag_pipeline = RAGPipeline()
+        
+        # Check if vector store exists
+        vector_store_path = Path("test_store")
+        if not (vector_store_path / "index.faiss").exists():
+            raise HTTPException(
+                status_code=404, 
+                detail="Vector store not found. Please upload and index some documents first."
+            )
+        
+        # Perform direct query
+        result = rag_pipeline.ask(
+            query=request.query,
+            top_k=request.top_k,
+            include_quality_score=True
+        )
+        
+        return APIResponse(
+            success=True,
+            message="Query executed successfully",
+            data={
+                'query': request.query,
+                'answer': result['answer'],
+                'context': result['context'],
+                'quality_score': result.get('quality_score'),
+                'quality_status': result.get('quality_status'),
+                'parameters': {
+                    'top_k': request.top_k,
+                    'model': request.model
+                }
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing query: {str(e)}")
+
+# Generate responses endpoint
+@app.post("/api/generate-responses")
+async def generate_responses(request: GenerateResponsesRequest):
+    """
+    Generate responses for multiple requirements using the RAG pipeline
+    """
+    try:
+        # Validate session exists
+        if request.session_id not in sessions:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Initialize RAG pipeline
+        rag_pipeline = RAGPipeline()
+        
+        # Check if vector store exists
+        vector_store_path = Path("test_store")
+        if not (vector_store_path / "index.faiss").exists():
+            raise HTTPException(
+                status_code=404, 
+                detail="Vector store not found. Please upload and index some documents first."
+            )
+        
+        # Generate responses for each requirement
+        responses = []
+        for i, requirement in enumerate(request.requirements):
+            try:
+                result = rag_pipeline.ask(
+                    query=requirement,
+                    top_k=request.top_k,
+                    include_quality_score=True
+                )
+                
+                responses.append({
+                    'requirement_index': i,
+                    'requirement': requirement,
+                    'answer': result['answer'],
+                    'quality_score': result.get('quality_score'),
+                    'quality_status': result.get('quality_status'),
+                    'status': 'success'
+                })
+                
+            except Exception as req_error:
+                responses.append({
+                    'requirement_index': i,
+                    'requirement': requirement,
+                    'answer': None,
+                    'error': str(req_error),
+                    'status': 'error'
+                })
+        
+        # Update session with generated responses
+        sessions[request.session_id]['responses'] = responses
+        sessions[request.session_id]['response_generation_time'] = datetime.now().isoformat()
+        
+        # Calculate success metrics
+        successful_responses = [r for r in responses if r['status'] == 'success']
+        failed_responses = [r for r in responses if r['status'] == 'error']
+        
+        return APIResponse(
+            success=True,
+            message=f"Generated responses for {len(successful_responses)}/{len(request.requirements)} requirements",
+            session_id=request.session_id,
+            data={
+                'responses': responses,
+                'summary': {
+                    'total_requirements': len(request.requirements),
+                    'successful_responses': len(successful_responses),
+                    'failed_responses': len(failed_responses),
+                    'success_rate': len(successful_responses) / len(request.requirements) * 100
+                },
+                'parameters': {
+                    'top_k': request.top_k,
+                    'model': request.model
+                }
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating responses: {str(e)}")
+
 # Clean up session endpoint
 @app.delete("/api/session/{session_id}")
 async def cleanup_session(session_id: str):
@@ -264,4 +427,8 @@ if __name__ == "__main__":
     print("🚀 Starting RFP Response Generator API Server...")
     print("📖 API Documentation: http://localhost:8000/docs")
     print("🔍 Alternative Docs: http://localhost:8000/redoc")
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    try:
+        uvicorn.run("api_server:app", host="0.0.0.0", port=8000, reload=False)
+    except Exception as e:
+        print(f"Error starting server: {e}")
+        uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
