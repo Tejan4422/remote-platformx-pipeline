@@ -62,6 +62,14 @@ class GenerateResponsesRequest(BaseModel):
     model: Optional[str] = "llama3"
     session_id: str
 
+class UploadResponse(BaseModel):
+    success: bool
+    message: str
+    session_id: str
+    requirements: List[str]
+    extraction_metadata: Optional[Dict] = None
+    file_info: Dict[str, Any]
+
 class APIResponse(BaseModel):
     success: bool
     message: str
@@ -117,6 +125,139 @@ async def get_vector_store_status():
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking vector store: {str(e)}")
+
+# File upload and requirement extraction endpoint
+@app.post("/api/upload-rfp", response_model=UploadResponse)
+async def upload_rfp_document(file: UploadFile = File(...)):
+    """
+    Upload an RFP document and extract requirements
+    Supports PDF, DOCX, XLSX, XLS files
+    """
+    # Validate file type
+    allowed_extensions = {'.pdf', '.docx', '.xlsx', '.xls'}
+    file_extension = Path(file.filename).suffix.lower()
+    
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}"
+        )
+    
+    # Generate session ID
+    session_id = str(uuid.uuid4())
+    
+    # Create temporary file
+    temp_dir = Path("temp_uploads")
+    temp_dir.mkdir(exist_ok=True)
+    
+    temp_file_path = temp_dir / f"{session_id}_{file.filename}"
+    
+    try:
+        # Save uploaded file
+        with open(temp_file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Store temp file path for cleanup
+        temp_files[session_id] = str(temp_file_path)
+        
+        # Extract requirements
+        extractor = RequirementExtractor()
+        
+        # Check if it's a structured file (Excel)
+        if file_extension in {'.xlsx', '.xls'}:
+            # Use metadata extraction for structured files
+            extraction_result = extractor.extract_with_metadata(str(temp_file_path))
+            requirements = extraction_result['requirements']
+            extraction_metadata = extraction_result
+        else:
+            # Use regular extraction for PDF/DOCX
+            requirements = extractor.extract_from_file(str(temp_file_path))
+            extraction_metadata = None
+        
+        # Store session data
+        sessions[session_id] = {
+            'requirements': requirements,
+            'extraction_metadata': extraction_metadata,
+            'uploaded_file': file.filename,
+            'file_type': file_extension,
+            'timestamp': datetime.now().isoformat(),
+            'temp_file_path': str(temp_file_path)
+        }
+        
+        file_info = {
+            'filename': file.filename,
+            'size': file.size if hasattr(file, 'size') else 'unknown',
+            'type': file.content_type,
+            'extension': file_extension
+        }
+        
+        return UploadResponse(
+            success=True,
+            message=f"Successfully extracted {len(requirements)} requirements from {file.filename}",
+            session_id=session_id,
+            requirements=requirements,
+            extraction_metadata=extraction_metadata,
+            file_info=file_info
+        )
+        
+    except Exception as e:
+        # Clean up on error
+        if temp_file_path.exists():
+            temp_file_path.unlink()
+        if session_id in temp_files:
+            del temp_files[session_id]
+        if session_id in sessions:
+            del sessions[session_id]
+            
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+# Get requirements for a session
+@app.get("/api/requirements/{session_id}")
+async def get_requirements(session_id: str):
+    """Get extracted requirements for a specific session"""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session_data = sessions[session_id]
+    
+    return APIResponse(
+        success=True,
+        message="Requirements retrieved successfully",
+        session_id=session_id,
+        data={
+            'requirements': session_data['requirements'],
+            'extraction_metadata': session_data.get('extraction_metadata'),
+            'file_info': {
+                'filename': session_data['uploaded_file'],
+                'file_type': session_data['file_type'],
+                'upload_time': session_data['timestamp']
+            },
+            'total_requirements': len(session_data['requirements'])
+        }
+    )
+
+# Clean up session endpoint
+@app.delete("/api/session/{session_id}")
+async def cleanup_session(session_id: str):
+    """Clean up session data and temporary files"""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Clean up temp file
+    if session_id in temp_files:
+        temp_file_path = Path(temp_files[session_id])
+        if temp_file_path.exists():
+            temp_file_path.unlink()
+        del temp_files[session_id]
+    
+    # Remove session data
+    del sessions[session_id]
+    
+    return APIResponse(
+        success=True,
+        message="Session cleaned up successfully",
+        session_id=session_id
+    )
 
 if __name__ == "__main__":
     import uvicorn
