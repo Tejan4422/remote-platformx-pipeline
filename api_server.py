@@ -173,7 +173,18 @@ async def upload_rfp_document(file: UploadFile = File(...)):
             # Use metadata extraction for structured files
             extraction_result = extractor.extract_with_metadata(str(temp_file_path))
             requirements = extraction_result['requirements']
-            extraction_metadata = extraction_result
+            # Convert DataFrame to dict for JSON serialization
+            extraction_metadata = {}
+            for key, value in extraction_result.items():
+                try:
+                    if hasattr(value, 'to_dict') and callable(getattr(value, 'to_dict', None)):
+                        extraction_metadata[key] = value.to_dict('records')
+                    else:
+                        extraction_metadata[key] = value
+                except Exception as e:
+                    # Fallback to string representation if serialization fails
+                    extraction_metadata[key] = str(value)
+                    print(f"Warning: Could not serialize {key}: {e}")
         else:
             # Use regular extraction for PDF/DOCX
             requirements = extractor.extract_from_file(str(temp_file_path))
