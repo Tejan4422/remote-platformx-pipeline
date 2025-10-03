@@ -17,6 +17,11 @@ venv/
 temp_uploads/
 server.log
 
+# Test result files
+*test_results.json
+*_test.json
+phase*_test*.json
+
 # Optional: exclude large data files
 # data/raw/*.pdf
 # data/raw/*.docx
