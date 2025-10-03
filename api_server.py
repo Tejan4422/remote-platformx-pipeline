@@ -62,6 +62,11 @@ class GenerateResponsesRequest(BaseModel):
     model: Optional[str] = "llama3"
     session_id: str
 
+class IndexResponsesRequest(BaseModel):
+    file_path: Optional[str] = None
+    rfp_pairs: Optional[List[Dict[str, str]]] = None
+    metadata: Optional[Dict[str, Any]] = None
+
 class UploadResponse(BaseModel):
     success: bool
     message: str
@@ -422,13 +427,273 @@ async def cleanup_session(session_id: str):
         session_id=session_id
     )
 
+# ============================================================================
+# PHASE 4: KNOWLEDGE BASE APIs
+# ============================================================================
+
+# Index RFP responses endpoint
+@app.post("/api/index-responses")
+async def index_rfp_responses(file: UploadFile = File(...)):
+    """
+    Index RFP responses from an uploaded Excel file to the vector store
+    Expected format: Excel file with 'Requirement' and 'Response' columns
+    """
+    # Validate file type
+    allowed_extensions = {'.xlsx', '.xls'}
+    file_extension = Path(file.filename).suffix.lower()
+    
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file type for RFP indexing. Allowed: {', '.join(allowed_extensions)}"
+        )
+    
+    # Generate unique filename
+    temp_dir = Path("temp_uploads")
+    temp_dir.mkdir(exist_ok=True)
+    temp_file_path = temp_dir / f"index_{uuid.uuid4()}_{file.filename}"
+    
+    try:
+        # Save uploaded file
+        with open(temp_file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Initialize indexer
+        indexer = RFPResponseIndexer()
+        
+        # Index the RFP responses
+        result = indexer.index_rfp_responses(str(temp_file_path))
+        
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result.get('error', 'Unknown indexing error'))
+        
+        # Clean up temp file
+        temp_file_path.unlink()
+        
+        return APIResponse(
+            success=True,
+            message=f"Successfully indexed {result['documents_added']} RFP responses from {file.filename}",
+            data={
+                'file_info': {
+                    'filename': file.filename,
+                    'size': file.size if hasattr(file, 'size') else 'unknown',
+                    'type': file.content_type
+                },
+                'indexing_results': {
+                    'documents_added': result['documents_added'],
+                    'rfp_pairs_found': result['total_pairs'],
+                    'requirement_column': result['requirement_column'],
+                    'response_column': result['response_column'],
+                    'initial_document_count': result['initial_document_count'],
+                    'final_document_count': result['final_document_count'],
+                    'timestamp': result['timestamp']
+                },
+                'vector_store_info': {
+                    'path': result['vector_store_path'],
+                    'total_documents': result['final_document_count']
+                }
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Clean up on error
+        if temp_file_path.exists():
+            temp_file_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Error indexing RFP responses: {str(e)}")
+
+# Upload historical data endpoint 
+@app.post("/api/upload-historical-data")
+async def upload_historical_data(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] = File(...),
+    description: Optional[str] = None
+):
+    """
+    Upload multiple historical data files for batch indexing
+    Supports multiple Excel files with RFP response data
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+    
+    # Validate all files
+    allowed_extensions = {'.xlsx', '.xls'}
+    for file in files:
+        file_extension = Path(file.filename).suffix.lower()
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported file type: {file.filename}. Allowed: {', '.join(allowed_extensions)}"
+            )
+    
+    upload_id = str(uuid.uuid4())
+    temp_dir = Path("temp_uploads") / upload_id
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        # Save all files
+        saved_files = []
+        for file in files:
+            temp_file_path = temp_dir / f"{file.filename}"
+            with open(temp_file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            saved_files.append({
+                'filename': file.filename,
+                'path': str(temp_file_path),
+                'size': file.size if hasattr(file, 'size') else 'unknown'
+            })
+        
+        # Process files and index
+        indexer = RFPResponseIndexer()
+        total_documents_added = 0
+        total_pairs_found = 0
+        processing_results = []
+        
+        for file_info in saved_files:
+            try:
+                result = indexer.index_rfp_responses(file_info['path'])
+                if result['success']:
+                    total_documents_added += result['documents_added']
+                    total_pairs_found += result['total_pairs']
+                    processing_results.append({
+                        'filename': file_info['filename'],
+                        'success': True,
+                        'documents_added': result['documents_added'],
+                        'pairs_found': result['total_pairs'],
+                        'requirement_column': result['requirement_column'],
+                        'response_column': result['response_column']
+                    })
+                else:
+                    processing_results.append({
+                        'filename': file_info['filename'],
+                        'success': False,
+                        'error': result.get('error', 'Unknown error')
+                    })
+            except Exception as e:
+                processing_results.append({
+                    'filename': file_info['filename'],
+                    'success': False,
+                    'error': str(e)
+                })
+        
+        # Clean up temp directory
+        shutil.rmtree(temp_dir)
+        
+        successful_files = [r for r in processing_results if r['success']]
+        failed_files = [r for r in processing_results if not r['success']]
+        
+        return APIResponse(
+            success=len(successful_files) > 0,
+            message=f"Processed {len(successful_files)}/{len(files)} files successfully. Added {total_documents_added} documents to vector store.",
+            data={
+                'upload_info': {
+                    'upload_id': upload_id,
+                    'description': description,
+                    'timestamp': datetime.now().isoformat(),
+                    'total_files': len(files),
+                    'successful_files': len(successful_files),
+                    'failed_files': len(failed_files)
+                },
+                'summary': {
+                    'total_documents_added': total_documents_added,
+                    'total_pairs_found': total_pairs_found
+                },
+                'processing_results': processing_results,
+                'successful_files': successful_files,
+                'failed_files': failed_files
+            }
+        )
+        
+    except Exception as e:
+        # Clean up on error
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+        raise HTTPException(status_code=500, detail=f"Error processing historical data: {str(e)}")
+
+# Get vector store stats endpoint
+@app.get("/api/vector-store/stats")
+async def get_vector_store_stats():
+    """
+    Get comprehensive statistics about the vector store
+    """
+    try:
+        indexer = RFPResponseIndexer()
+        store_info = indexer.get_vector_store_info()
+        
+        # Get additional file system info
+        vector_store_path = Path("test_store")
+        faiss_path = vector_store_path / "index.faiss"
+        docstore_path = vector_store_path / "docstore.pkl"
+        
+        file_stats = {}
+        if faiss_path.exists():
+            faiss_stat = faiss_path.stat()
+            file_stats['faiss_index'] = {
+                'size_bytes': faiss_stat.st_size,
+                'size_mb': round(faiss_stat.st_size / (1024 * 1024), 2),
+                'modified': datetime.fromtimestamp(faiss_stat.st_mtime).isoformat()
+            }
+        
+        if docstore_path.exists():
+            docstore_stat = docstore_path.stat()
+            file_stats['document_store'] = {
+                'size_bytes': docstore_stat.st_size,
+                'size_mb': round(docstore_stat.st_size / (1024 * 1024), 2),
+                'modified': datetime.fromtimestamp(docstore_stat.st_mtime).isoformat()
+            }
+        
+        # Calculate total size
+        total_size_bytes = sum(
+            stats['size_bytes'] for stats in file_stats.values()
+        )
+        
+        return APIResponse(
+            success=True,
+            message="Vector store statistics retrieved successfully",
+            data={
+                'vector_store': {
+                    'exists': store_info['exists'],
+                    'path': store_info['path'],
+                    'total_documents': store_info.get('total_documents', 0),
+                    'vector_dimension': store_info.get('vector_dimension', 0),
+                    'index_size': store_info.get('index_size', 0)
+                },
+                'file_statistics': file_stats,
+                'storage_summary': {
+                    'total_size_bytes': total_size_bytes,
+                    'total_size_mb': round(total_size_bytes / (1024 * 1024), 2),
+                    'files_count': len(file_stats)
+                },
+                'capabilities': {
+                    'ready_for_queries': store_info['exists'],
+                    'supports_similarity_search': store_info['exists'],
+                    'can_add_documents': True
+                },
+                'metadata': {
+                    'retrieved_at': datetime.now().isoformat(),
+                    'vector_store_path': str(vector_store_path)
+                }
+            }
+        )
+        
+    except Exception as e:
+        return APIResponse(
+            success=False,
+            message=f"Error retrieving vector store statistics: {str(e)}",
+            data={
+                'error_details': str(e),
+                'vector_store_path': str(Path("test_store"))
+            }
+        )
+
 if __name__ == "__main__":
     import uvicorn
     print("🚀 Starting RFP Response Generator API Server...")
-    print("📖 API Documentation: http://localhost:8000/docs")
-    print("🔍 Alternative Docs: http://localhost:8000/redoc")
+    print("📖 API Documentation: http://localhost:8001/docs")
+    print("🔍 Alternative Docs: http://localhost:8001/redoc")
     try:
-        uvicorn.run("api_server:app", host="0.0.0.0", port=8000, reload=False)
+        uvicorn.run("api_server:app", host="0.0.0.0", port=8001, reload=False)
     except Exception as e:
         print(f"Error starting server: {e}")
-        uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+        uvicorn.run(app, host="0.0.0.0", port=8001, reload=False)

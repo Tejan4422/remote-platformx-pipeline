@@ -1,0 +1,41 @@
+{
+  "health_check": {
+    "status_code": 200,
+    "success": true,
+    "response": {
+      "success": true,
+      "message": "RFP Response Generator API is running",
+      "data": {
+        "timestamp": "2025-10-03T19:17:30.363454",
+        "version": "1.0.0",
+        "status": "healthy"
+      },
+      "session_id": null
+    }
+  },
+  "endpoint_availability": {
+    "/api/vector-store/stats": {
+      "exists": true,
+      "status": "Available"
+    },
+    "/api/index-responses": {
+      "exists": true,
+      "status": "Available"
+    },
+    "/api/upload-historical-data": {
+      "exists": true,
+      "status": "Available"
+    }
+  },
+  "openapi_schema": {
+    "success": true,
+    "found_endpoints": [
+      "/api/vector-store/stats",
+      "/api/index-responses",
+      "/api/upload-historical-data"
+    ],
+    "missing_endpoints": [],
+    "total_endpoints": 12,
+    "schema_available": true
+  }
+}
