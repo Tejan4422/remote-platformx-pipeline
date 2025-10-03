@@ -1,0 +1,57 @@
+
+# PHASE 5: Sample cURL Commands for Manual Testing
+
+## 1. Health Check
+curl -X GET "http://localhost:8001/health" \
+  -H "accept: application/json"
+
+## 2. Vector Store Status
+curl -X GET "http://localhost:8001/api/vector-store/status" \
+  -H "accept: application/json"
+
+## 3. Vector Store Statistics
+curl -X GET "http://localhost:8001/api/vector-store/stats" \
+  -H "accept: application/json"
+
+## 4. Direct Query
+curl -X POST "http://localhost:8001/api/query" \
+  -H "accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is your project management methodology?",
+    "top_k": 3
+  }'
+
+## 5. Upload RFP Document (replace test.xlsx with actual file)
+curl -X POST "http://localhost:8001/api/upload-rfp" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@test.xlsx"
+
+## 6. Get Requirements (replace SESSION_ID)
+curl -X GET "http://localhost:8001/api/requirements/SESSION_ID" \
+  -H "accept: application/json"
+
+## 7. Generate Responses (replace SESSION_ID)
+curl -X POST "http://localhost:8001/api/generate-responses" \
+  -H "accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requirements": ["What is your experience?", "How do you ensure quality?"],
+    "top_k": 3,
+    "session_id": "SESSION_ID"
+  }'
+
+## 8. Get Generated Responses (replace SESSION_ID)
+curl -X GET "http://localhost:8001/api/responses/SESSION_ID" \
+  -H "accept: application/json"
+
+## 9. Index RFP Responses (replace responses.xlsx with actual file)
+curl -X POST "http://localhost:8001/api/index-responses" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@responses.xlsx"
+
+## 10. Clean Session (replace SESSION_ID)
+curl -X DELETE "http://localhost:8001/api/session/SESSION_ID" \
+  -H "accept: application/json"
