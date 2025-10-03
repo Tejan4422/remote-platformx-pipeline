@@ -1,82 +1,64 @@
-# Local RAG Application
+# 🚀 RFP Response Generator - Full-Stack Monorepo
 
-This project is a local implementation of a Retrieval-Augmented Generation (RAG) pipeline that extracts requirements from RFP documents and generates professional responses using local language models.
+A comprehensive AI-powered RFP (Request for Proposal) response generation system built with FastAPI backend and React frontend.
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-local-rag-app/
-├── README.md
-├── requirements.txt
-├── demo.sh
-├── quick_test.py
-├── debug_extraction.py
-├── show_improvement.py
-├── test_real_pdf.py
-├── test_system.py
-├── test_vector_store.py
-├── data/
-│   ├── processed/
-│   └── raw/
-│       └── Test_rfp - Sheet1.pdf
-├── output/
-├── src/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── index_documents.py
-│   │   ├── output_generator.py
-│   │   ├── pdf_generator.py
-│   │   ├── rag_pipeline.py
-│   │   ├── streamlit_app_simple.py
-│   │   ├── streamlit_app.py
-│   │   ├── test_retrieval.py
-│   │   └── utils.py
-│   ├── config/
-│   │   ├── __init__.py
-│   │   └── settings.py
-│   ├── ingestion/
-│   │   ├── __init__.py
-│   │   ├── document_processor.py
-│   │   ├── excel_loader.py
-│   │   ├── requirement_extractor.py
-│   │   └── advanced/
-│   ├── retrieval/
-│   │   ├── __init__.py
-│   │   ├── embeddings.py
-│   │   ├── openai_client.py
-│   │   └── vector_store.py
-│   └── vector_store/
-│       ├── __init__.py
-│       ├── test_vector_store.py
-│       └── vector_store.py
-├── test_store/
-│   ├── docstore.pkl
-│   └── index.faiss
-└── tests/
-    ├── __init__.py
-    ├── test_enhanced_extraction.py
-    ├── test_ingestion.py
-    └── test_retrieval.py
+rfp-response-generator/
+├── README.md                          # This file
+├── .gitignore                         # Git ignore patterns
+├── requirements.txt                   # Backend dependencies
+├── .env                              # Backend environment variables
+├── 
+├── api_server.py                     # Main FastAPI application
+├── src/                              # Backend source code
+│   ├── app/                          # Application logic
+│   ├── config/                       # Configuration
+│   ├── ingestion/                    # Document processing
+│   ├── retrieval/                    # Vector search & embeddings
+│   └── vector_store/                 # Vector database
+├── data/                             # Data storage
+├── tests/                            # Backend tests
+├── docs/                             # Backend documentation
+│
+├── frontend/                         # React + TypeScript Frontend
+│   ├── package.json                  # Node.js dependencies
+│   ├── vite.config.ts               # Vite configuration
+│   ├── .env.local                   # Frontend environment variables
+│   ├── src/                         # Source code
+│   │   ├── components/              # React components
+│   │   ├── hooks/                   # Custom React hooks
+│   │   ├── lib/                     # Utilities & API client
+│   │   ├── contexts/                # React contexts
+│   │   └── pages/                   # Page components
+│   └── public/                      # Static assets
+│
+└── frontend-integration/            # Integration files for frontend
+    ├── api-client.ts                # Type-safe API client
+    ├── useAPI.ts                    # React Query hooks
+    ├── DocumentUpload.tsx           # Enhanced upload component
+    ├── ChatInterface.tsx            # Real-time chat interface
+    ├── KnowledgeBase.tsx            # Knowledge management
+    ├── SessionContext.tsx           # Session state management
+    └── INTEGRATION_GUIDE.md         # Integration instructions
 ```
 
-## Core Components
+## 🛠️ Technology Stack
 
-### Application Layer (`src/app/`)
-- **`streamlit_app.py`**: Main web interface for RFP processing
-- **`rag_pipeline.py`**: Core RAG processing pipeline
-- **`output_generator.py`**: Excel and CSV file generation
-- **`pdf_generator.py`**: PDF report generation
+### Backend (Python + FastAPI + RAG)
+- **FastAPI** - Modern, fast web framework
+- **LangChain** - RAG (Retrieval Augmented Generation)
+- **FAISS** - Vector similarity search
+- **OpenAI/Ollama** - Language models
+- **PyPDF2** - PDF processing
+- **pandas** - Data manipulation
 
-### Ingestion Layer (`src/ingestion/`)
-- **`requirement_extractor.py`**: Extracts requirements from PDF/Excel/CSV files
-- **`document_processor.py`**: Text extraction and document chunking
-- **`excel_loader.py`**: Excel and CSV file processing
-
-### Retrieval Layer (`src/retrieval/`)
-- **`embeddings.py`**: Text embedding generation
-- **`vector_store.py`**: FAISS vector storage and similarity search
-- **`openai_client.py`**: Language model integration
-
-### Configuration (`src/config/`)
-- **`settings.py`**: Application configuration and constants
+### Frontend (React + TypeScript)
+- **React 18** - UI framework
+- **TypeScript** - Type-safe JavaScript
+- **Vite** - Fast build tool
+- **shadcn/ui** - UI component library
+- **Tailwind CSS** - Utility-first styling
+- **React Query** - Server state management
 
