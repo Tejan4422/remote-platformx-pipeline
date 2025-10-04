@@ -27,4 +27,5 @@ frontend/
 
 # Optional: exclude large data files
 # data/raw/*.pdf
-# data/raw/*.docx
+# data/raw/*.docxtest_store/
+phase5_*.json
