@@ -698,11 +698,78 @@ async def get_vector_store_stats():
             }
         )
 
+# Download/Export responses endpoint
+@app.get("/api/download-responses/{session_id}")
+async def download_responses(session_id: str, format: str = "excel"):
+    """
+    Download generated responses in Excel or PDF format
+    """
+    try:
+        # Validate session exists
+        if session_id not in sessions:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session_data = sessions[session_id]
+        
+        if 'responses' not in session_data:
+            raise HTTPException(
+                status_code=404, 
+                detail="No responses found for this session. Generate responses first."
+            )
+        
+        responses = session_data['responses']
+        requirements = session_data['requirements']
+        
+        if format.lower() == "excel":
+            # Generate Excel file
+            import pandas as pd
+            import io
+            
+            # Prepare data for Excel
+            data = []
+            for response in responses:
+                data.append({
+                    'Requirement': response['requirement'],
+                    'Generated_Response': response.get('answer', 'N/A'),
+                    'Quality_Score': response.get('quality_score', 'N/A'),
+                    'Quality_Status': response.get('quality_status', 'N/A'),
+                    'Status': response['status']
+                })
+            
+            df = pd.DataFrame(data)
+            
+            # Create Excel file in memory
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='RFP_Responses', index=False)
+            
+            excel_buffer.seek(0)
+            
+            # Generate filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"rfp_responses_{session_id[:8]}_{timestamp}.xlsx"
+            
+            from fastapi.responses import StreamingResponse
+            
+            return StreamingResponse(
+                io.BytesIO(excel_buffer.getvalue()),
+                media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+        
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported format. Use 'excel'.")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating download: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting RFP Response Generator API Server...")
-    print("📖 API Documentation: http://localhost:8001/docs")
-    print("🔍 Alternative Docs: http://localhost:8001/redoc")
+    print("Starting RFP Response Generator API Server...")
+    print("API Documentation: http://localhost:8001/docs")
+    print("Alternative Docs: http://localhost:8001/redoc")
     try:
         uvicorn.run("api_server:app", host="0.0.0.0", port=8001, reload=False)
     except Exception as e:
