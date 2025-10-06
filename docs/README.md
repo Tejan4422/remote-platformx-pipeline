@@ -20,7 +20,7 @@ This directory contains comprehensive documentation for the Local RAG Applicatio
 ### 📊 Implementation Details
 - **[IMPLEMENTATION_SUMMARY.md](./implementation/IMPLEMENTATION_SUMMARY.md)** - Technical implementation summary
 
-### �🔧 Troubleshooting
+### 🚨 Troubleshooting
 - **[TROUBLESHOOTING_GUIDE.md](./troubleshooting/TROUBLESHOOTING_GUIDE.md)** - Solutions to common issues, debugging steps, and diagnostic commands
 
 ### 📊 Features
