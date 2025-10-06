@@ -9,7 +9,7 @@ This directory contains comprehensive documentation for the Local RAG Applicatio
 - **[DEVELOPMENT_WORKFLOW.md](./setup/DEVELOPMENT_WORKFLOW.md)** - Development workflows, API integration, and testing procedures
 - **[LOCAL_DEVELOPMENT_GUIDE.md](./setup/LOCAL_DEVELOPMENT_GUIDE.md)** - Local development environment setup
 
-### � API Documentation
+### 🔌 API Documentation
 - **[API_DOCUMENTATION.md](./api/API_DOCUMENTATION.md)** - Complete API documentation with TypeScript interfaces
 
 ### 🎨 Frontend Documentation
