@@ -757,8 +757,123 @@ async def download_responses(session_id: str, format: str = "excel"):
                 headers={"Content-Disposition": f"attachment; filename={filename}"}
             )
         
+        elif format.lower() == "pdf":
+            # Generate PDF file
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            import io
+            
+            # Create PDF buffer
+            pdf_buffer = io.BytesIO()
+            
+            # Create the PDF document
+            doc = SimpleDocTemplate(pdf_buffer, pagesize=A4,
+                                  rightMargin=72, leftMargin=72,
+                                  topMargin=72, bottomMargin=18)
+            
+            # Container for the 'Flowable' objects
+            elements = []
+            
+            # Define styles
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=16,
+                spaceAfter=30,
+                alignment=1  # Center alignment
+            )
+            
+            heading_style = ParagraphStyle(
+                'CustomHeading',
+                parent=styles['Heading2'],
+                fontSize=12,
+                spaceBefore=12,
+                spaceAfter=6,
+                textColor=colors.HexColor('#2563eb')
+            )
+            
+            normal_style = ParagraphStyle(
+                'CustomNormal',
+                parent=styles['Normal'],
+                fontSize=10,
+                spaceAfter=12,
+                wordWrap='CJK'
+            )
+            
+            # Add title
+            title = Paragraph("RFP Response Report", title_style)
+            elements.append(title)
+            elements.append(Spacer(1, 12))
+            
+            # Add metadata
+            metadata_data = [
+                ['Session ID:', session_id[:8]],
+                ['Generated:', datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+                ['Total Requirements:', str(len(requirements))],
+                ['Successful Responses:', str(len([r for r in responses if r.get('status') == 'success']))],
+            ]
+            
+            metadata_table = Table(metadata_data, colWidths=[2*inch, 3*inch])
+            metadata_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ]))
+            
+            elements.append(metadata_table)
+            elements.append(Spacer(1, 20))
+            
+            # Add responses
+            for i, response in enumerate(responses):
+                # Requirement header
+                req_heading = Paragraph(f"Requirement {i+1}", heading_style)
+                elements.append(req_heading)
+                
+                # Requirement text
+                req_text = Paragraph(f"<b>Question:</b> {response['requirement']}", normal_style)
+                elements.append(req_text)
+                
+                # Response text
+                response_text = response.get('answer', 'No response generated')
+                resp_paragraph = Paragraph(f"<b>Generated Response:</b> {response_text}", normal_style)
+                elements.append(resp_paragraph)
+                
+                # Quality information
+                quality_score = response.get('quality_score', 0)
+                quality_status = response.get('quality_status', 'Unknown')
+                quality_text = Paragraph(f"<b>Quality Score:</b> {quality_score}% ({quality_status})", normal_style)
+                elements.append(quality_text)
+                
+                # Add spacing between requirements
+                elements.append(Spacer(1, 20))
+                
+                # Add page break every 3 requirements to avoid overly long pages
+                if (i + 1) % 3 == 0 and i < len(responses) - 1:
+                    elements.append(PageBreak())
+            
+            # Build PDF
+            doc.build(elements)
+            pdf_buffer.seek(0)
+            
+            # Generate filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"rfp_responses_{session_id[:8]}_{timestamp}.pdf"
+            
+            from fastapi.responses import StreamingResponse
+            
+            return StreamingResponse(
+                io.BytesIO(pdf_buffer.getvalue()),
+                media_type='application/pdf',
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+        
         else:
-            raise HTTPException(status_code=400, detail="Unsupported format. Use 'excel'.")
+            raise HTTPException(status_code=400, detail="Unsupported format. Use 'excel' or 'pdf'.")
             
     except HTTPException:
         raise
