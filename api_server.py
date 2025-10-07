@@ -12,12 +12,20 @@ from typing import Dict, List, Optional, Any
 import uuid
 import tempfile
 import shutil
+import io
 
 # FastAPI imports
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
+
+# PDF generation imports
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
 # Add src to path to import our modules
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
@@ -748,9 +756,7 @@ async def download_responses(session_id: str, format: str = "excel"):
             # Generate filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"rfp_responses_{session_id[:8]}_{timestamp}.xlsx"
-            
-            from fastapi.responses import StreamingResponse
-            
+
             return StreamingResponse(
                 io.BytesIO(excel_buffer.getvalue()),
                 media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -759,13 +765,6 @@ async def download_responses(session_id: str, format: str = "excel"):
         
         elif format.lower() == "pdf":
             # Generate PDF file
-            from reportlab.lib import colors
-            from reportlab.lib.pagesizes import letter, A4
-            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib.units import inch
-            import io
-            
             # Create PDF buffer
             pdf_buffer = io.BytesIO()
             
@@ -863,9 +862,7 @@ async def download_responses(session_id: str, format: str = "excel"):
             # Generate filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"rfp_responses_{session_id[:8]}_{timestamp}.pdf"
-            
-            from fastapi.responses import StreamingResponse
-            
+
             return StreamingResponse(
                 io.BytesIO(pdf_buffer.getvalue()),
                 media_type='application/pdf',
