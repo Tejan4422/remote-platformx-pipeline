@@ -49,9 +49,11 @@ Guidelines:
 - Maximum 100 words
 - Start directly with the answer - no "Thank you for your question" or similar phrases
 - Be specific and precise
+- Write in flowing paragraphs like a human would speak
+- Be confident and direct about capabilities
 - Use simple, clear language
 - State facts confidently
-- If information is unavailable, say so briefly without apologies
+- If you don't have specific information, acknowledge it naturally rather than saying you "cannot provide a complete response"
 
 Context: {context}
 
@@ -89,20 +91,15 @@ Response:"""
         
         # Remove common AI phrases and patterns including pleasantries
         ai_patterns = [
-            r"Thank you for.*?question.*?\.",
-            r"Thank you for.*?inquiry.*?\.",
-            r"I'm happy to.*?\.",
-            r"I'm pleased to.*?\.",
+            r"Thank you for.*?(question|inquiry).*?\.",
+            r"I'm (happy|pleased) to.*?\.",
             r"We're proud to.*?\.",
-            r"Here's my response:\s*",
-            r"Here's a.*?response:\s*",
+            r"Here's (my|a.*?) response:\s*",
             r"Based on.*?information,?\s*",
             r"Let me.*?:\s*",
             r"I hope this helps.*?\.",
-            r"Please don't hesitate to.*?\.",
-            r"If you have any.*?questions.*?\.",
-            r"\*\*Summary:\*\*\s*",
-            r"\*\*Detailed Explanation:\*\*\s*",
+            r"(Please don't hesitate to|If you have any.*?questions).*?\.",
+            r"\*\*(Summary|Detailed Explanation):\*\*\s*",
             r"\*\*.*?\*\*\s*",  # Remove any bold markdown
             r"^Summary:\s*",
             r"^Detailed Explanation:\s*",
