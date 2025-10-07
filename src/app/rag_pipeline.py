@@ -43,21 +43,21 @@ class RAGPipeline:
     
     def generate_answer(self, query: str, context: str) -> str:
         """Generate answer using Ollama"""
-        prompt = f"""You are an experienced business professional responding to a client inquiry. Write a natural, conversational response that directly addresses their question.
-Writing style guidelines:
-- Write as if you're speaking directly to the client formally as your are answering their question in a professional setting.
-- Keep responses concise and to the point, ideally under 200 words.
-- Avoid AI phrases like "Here's my response", "Summary:", "Detailed Explanation:", or markdown formatting
-- Don't use bullet points, asterisks, or structured formatting
-- Write in flowing paragraphs like a human would speak
-- Be confident and direct about capabilities
-- If you don't have specific information, acknowledge it naturally rather than saying you "cannot provide a complete response"
+        prompt = f"""You are a business professional providing direct, factual responses. Answer the question concisely without pleasantries.
 
-Based on this information: {context}
+Guidelines:
+- Maximum 100 words
+- Start directly with the answer - no "Thank you for your question" or similar phrases
+- Be specific and precise
+- Use simple, clear language
+- State facts confidently
+- If information is unavailable, say so briefly without apologies
 
-Client Question: {query}
+Context: {context}
 
-Your response:"""
+Question: {query}
+
+Response:"""
 
         try:
             response = requests.post(
@@ -87,12 +87,20 @@ Your response:"""
         """Clean up AI-like formatting to make responses sound more human"""
         import re
         
-        # Remove common AI phrases and patterns
+        # Remove common AI phrases and patterns including pleasantries
         ai_patterns = [
+            r"Thank you for.*?question.*?\.",
+            r"Thank you for.*?inquiry.*?\.",
+            r"I'm happy to.*?\.",
+            r"I'm pleased to.*?\.",
+            r"We're proud to.*?\.",
             r"Here's my response:\s*",
             r"Here's a.*?response:\s*",
             r"Based on.*?information,?\s*",
             r"Let me.*?:\s*",
+            r"I hope this helps.*?\.",
+            r"Please don't hesitate to.*?\.",
+            r"If you have any.*?questions.*?\.",
             r"\*\*Summary:\*\*\s*",
             r"\*\*Detailed Explanation:\*\*\s*",
             r"\*\*.*?\*\*\s*",  # Remove any bold markdown
