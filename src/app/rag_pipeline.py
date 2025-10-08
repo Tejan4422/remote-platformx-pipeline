@@ -46,7 +46,7 @@ class RAGPipeline:
         prompt = f"""You are a business professional providing direct, detailed, factual responses. Answer the question concisely without pleasantries.
 
 Guidelines:
-- Maximum 150 words and minimum 10 words
+- Maximum 150 words
 - Start directly with the answer - no "Thank you for your question" or similar phrases
 - Be specific and elaborate where possible
 - Write in flowing paragraphs like a human would speak
