@@ -43,15 +43,14 @@ class RAGPipeline:
     
     def generate_answer(self, query: str, context: str) -> str:
         """Generate answer using Ollama"""
-        prompt = f"""You are a business professional providing direct, factual responses. Answer the question concisely without pleasantries.
+        prompt = f"""You are a business professional providing direct, detailed, factual responses. Answer the question concisely without pleasantries.
 
 Guidelines:
-- Maximum 100 words
+- Maximum 150 words and minimum 10 words
 - Start directly with the answer - no "Thank you for your question" or similar phrases
-- Be specific and precise
+- Be specific and elaborate where possible
 - Write in flowing paragraphs like a human would speak
-- Be confident and direct about capabilities
-- Use simple, clear language
+- Be confident, detailed and direct about capabilities
 - State facts confidently
 - If you don't have specific information, acknowledge it naturally rather than saying you "cannot provide a complete response"
 
