@@ -56,6 +56,7 @@ Guidelines:
 
 Context: {context}
 
+
 Question: {query}
 
 Response:"""
