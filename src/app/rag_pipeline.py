@@ -50,6 +50,7 @@ Guidelines:
 - Start directly with the answer - no "Thank you for your question" or similar phrases
 - Be specific and elaborate where possible
 - Write in flowing paragraphs like a human would speak
+- Dont just give ''Yes'' or ''No'' answers
 - Be confident about capabilities
 - State facts confidently
 - If you don't have specific information, acknowledge it naturally rather than saying you "cannot provide a complete response"
