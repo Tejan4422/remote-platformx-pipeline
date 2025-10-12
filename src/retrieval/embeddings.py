@@ -18,8 +18,8 @@ def get_model():
         _model = SentenceTransformer('all-MiniLM-L6-v2')
     return _model
 
-def embed_text(text: str) -> list[float]:
+def embed_text(text: str):
     """Generate embeddings for a given text using a local Hugging Face model."""
     model = get_model()
     embedding = model.encode(text)
-    return embedding.tolist()
+    return embedding
