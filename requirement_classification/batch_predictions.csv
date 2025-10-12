@@ -1,0 +1,11 @@
+requirement,predicted_category,confidence
+Implement GDPR compliance for customer data processing,Compliance,0.83
+Create automated loan approval workflow system,Functional,0.69
+Build predictive analytics model for customer churn,AI/ML,0.35
+Ensure system response time under 2 seconds,Compliance,0.3
+Generate executive dashboard for monthly KPIs,Business Intelligence,0.64
+Integrate with external credit scoring APIs,Functional,0.57
+Implement role-based access control system,Compliance,0.36
+Create machine learning fraud detection engine,Business Intelligence,0.33
+Build real-time reporting dashboard,Business Intelligence,0.6
+Ensure 99.9% system availability,Compliance,0.33

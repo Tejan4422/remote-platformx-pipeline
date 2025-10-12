@@ -1,0 +1,31 @@
+requirement,label
+Implement consent management for customer data processing.,Compliance
+Support approval workflows for large loan applications.,Functional
+Enable borrowers to upload KYC documents for verification.,Functional
+Implement consent management for customer data processing.,Compliance
+Comply with RBI and local financial authority guidelines.,Compliance
+Implement KPI tracking for branch performance.,Business Intelligence
+Provide customer acquisition analytics via dashboards.,Business Intelligence
+Support integration with credit bureau APIs for scoring.,Functional
+Develop an AI model to detect fraudulent loan applications.,AI/ML
+Maintain audit trails for all financial transactions.,Compliance
+Ensure low latency for dashboard load times.,Non functional
+Train a machine learning model to predict customer churn.,AI/ML
+Integrate Power BI for executive reporting on loan disbursement trends.,Business Intelligence
+Implement data encryption for sensitive customer information.,Compliance
+Create automated loan approval system for small amounts.,Functional
+Build real-time fraud detection dashboard.,Business Intelligence
+Optimize database queries for faster response times.,Non functional
+Develop predictive analytics for loan default risk.,AI/ML
+Ensure GDPR compliance for European customers.,Compliance
+Create mobile app for loan application submission.,Functional
+Implement role-based access control system.,Compliance
+Generate monthly performance reports automatically.,Business Intelligence
+Scale system to handle 10000 concurrent users.,Non functional
+Train NLP model for document classification.,AI/ML
+Integrate with external payment gateways.,Functional
+Implement data retention policies as per regulations.,Compliance
+Create executive dashboard for business metrics.,Business Intelligence
+Ensure 99.9% system uptime availability.,Non functional
+Develop recommendation engine for financial products.,AI/ML
+Enable digital signature verification for documents.,Functional
