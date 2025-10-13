@@ -13,7 +13,9 @@ class RequirementClassifier:
         "Compliance",
         "Functional",
         "Non-Functional",
-        "BI Tool"
+        "BI Tool",
+        "Gen AI or AI",
+        "Machine Learning",
     ]
     
     def __init__(self, ollama_url="http://localhost:11434", model="llama3"):
@@ -39,10 +41,12 @@ Categories:
 - Functional: Requirements describing what the system should do, features, business logic, etc.
 - Non-Functional: Requirements about performance, scalability, usability, reliability, etc.
 - BI Tool: Requirements specifically about Business Intelligence tools, reporting, analytics, dashboards, etc.
+- Gen AI or AI: Requirements related to Generative AI capabilities, models, or applications.
+- Machine Learning: Requirements related to machine learning models, training, inference, or data processing.
 
 IMPORTANT RULES:
 1. Respond with ONLY the category name - nothing else
-2. The response must be exactly one of: Tech, Security, Compliance, Functional, Non-Functional, BI Tool
+2. The response must be exactly one of: Tech, Security, Compliance, Functional, Non-Functional, BI Tool, Gen AI or AI, Machine Learning
 3. Do not add any explanation, punctuation, or additional text
 4. If unsure, choose the most relevant category
 
@@ -125,6 +129,10 @@ Category:"""
             "bi tool": "BI Tool",
             "bi": "BI Tool",
             "business intelligence": "BI Tool",
+            "gen ai": "Gen AI or AI",
+            "ai": "Gen AI or AI",
+            "machine learning": "Machine Learning",
+            "ml": "Machine Learning"
         }
         
         for variation, category in category_variations.items():
