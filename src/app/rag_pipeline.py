@@ -8,7 +8,8 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.retrieval.embeddings import embed_text
 from src.vector_store.vector_store import FAISSStore
-from app.quality_scorer import RFPQualityScorer
+from src.app.quality_scorer import RFPQualityScorer
+from src.app.requirement_classifier import RequirementClassifier
 
 class RAGPipeline:
     def __init__(self, store_dir="test_store", ollama_url="http://localhost:11434", model="llama3"):
@@ -17,6 +18,7 @@ class RAGPipeline:
         self.model = model
         self.vector_store = None
         self.quality_scorer = RFPQualityScorer()
+        self.requirement_classifier = RequirementClassifier(ollama_url, model)
         
     def load_vector_store(self):
         """Load the vector store"""
@@ -126,18 +128,24 @@ Response:"""
         
         return cleaned.strip()
     
-    def ask(self, query: str, top_k: int = 3, include_quality_score: bool = True) -> dict:
-        """Complete RAG pipeline: retrieve + generate + score quality"""
+    def ask(self, query: str, top_k: int = 3, include_quality_score: bool = True, include_category: bool = True) -> dict:
+        """Complete RAG pipeline: retrieve + generate + score quality + classify requirement"""
         print(f"Query: {query}")
         
-        # Step 1: Retrieve relevant context
+        # Step 1: Classify the requirement (if enabled)
+        category = None
+        if include_category:
+            category = self.requirement_classifier.classify_requirement(query)
+            print(f"Requirement Category: {category}")
+        
+        # Step 2: Retrieve relevant context
         context = self.retrieve_context(query, top_k)
         print(f"Retrieved {top_k} chunks")
         
-        # Step 2: Generate answer
+        # Step 3: Generate answer
         answer = self.generate_answer(query, context)
         
-        # Step 3: Score response quality (if enabled)
+        # Step 4: Score response quality (if enabled)
         quality_score = None
         if include_quality_score:
             quality_score = self.quality_scorer.score_response(query, answer)
@@ -148,6 +156,9 @@ Response:"""
             "context": context,
             "answer": answer
         }
+        
+        if category:
+            result["category"] = category
         
         if quality_score:
             result.update({
@@ -179,6 +190,8 @@ Response:"""
                 results.append({
                     "requirement": requirement,
                     "response": result["answer"],
+                    "category": result.get("category", "Unknown"),
+                    "quality_score": result.get("quality_score", 0),
                     "status": "success"
                 })
             except Exception as e:
@@ -186,6 +199,8 @@ Response:"""
                 results.append({
                     "requirement": requirement,
                     "response": f"Error processing requirement: {str(e)}",
+                    "category": "Unknown",
+                    "quality_score": 0,
                     "status": "error"
                 })
             

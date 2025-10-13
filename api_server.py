@@ -319,7 +319,8 @@ async def direct_query(request: QueryRequest):
         result = rag_pipeline.ask(
             query=request.query,
             top_k=request.top_k,
-            include_quality_score=True
+            include_quality_score=True,
+            include_category=True
         )
         
         return APIResponse(
@@ -329,6 +330,7 @@ async def direct_query(request: QueryRequest):
                 'query': request.query,
                 'answer': result['answer'],
                 'context': result['context'],
+                'category': result.get('category', 'Unknown'),
                 'quality_score': result.get('quality_score'),
                 'quality_status': result.get('quality_status'),
                 'parameters': {
@@ -370,13 +372,15 @@ async def generate_responses(request: GenerateResponsesRequest):
                 result = rag_pipeline.ask(
                     query=requirement,
                     top_k=request.top_k,
-                    include_quality_score=True
+                    include_quality_score=True,
+                    include_category=True
                 )
                 
                 responses.append({
                     'requirement_index': i,
                     'requirement': requirement,
                     'answer': result['answer'],
+                    'category': result.get('category', 'Unknown'),
                     'quality_score': result.get('quality_score'),
                     'quality_status': result.get('quality_status'),
                     'status': 'success'
@@ -387,6 +391,7 @@ async def generate_responses(request: GenerateResponsesRequest):
                     'requirement_index': i,
                     'requirement': requirement,
                     'answer': None,
+                    'category': 'Unknown',
                     'error': str(req_error),
                     'status': 'error'
                 })
@@ -738,6 +743,7 @@ async def download_responses(session_id: str, format: str = "excel"):
             for response in responses:
                 data.append({
                     'Requirement': response['requirement'],
+                    'Category': response.get('category', 'Unknown'),
                     'Generated_Response': response.get('answer', 'N/A'),
                     'Quality_Score': response.get('quality_score', 'N/A'),
                     'Quality_Status': response.get('quality_status', 'N/A'),
@@ -836,6 +842,11 @@ async def download_responses(session_id: str, format: str = "excel"):
                 # Requirement text
                 req_text = Paragraph(f"<b>Question:</b> {response['requirement']}", normal_style)
                 elements.append(req_text)
+                
+                # Category information
+                category = response.get('category', 'Unknown')
+                category_text = Paragraph(f"<b>Category:</b> {category}", normal_style)
+                elements.append(category_text)
                 
                 # Response text
                 response_text = response.get('answer', 'No response generated')
