@@ -13,6 +13,7 @@ import uuid
 import tempfile
 import shutil
 import io
+import pandas as pd
 
 # FastAPI imports
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
@@ -94,6 +95,13 @@ class MultiSheetProcessRequest(BaseModel):
     session_id: str
     requirement_columns: Optional[List[str]] = None
 
+class MultiSheetRAGRequest(BaseModel):
+    session_id: str
+    requirement_columns: Optional[List[str]] = None
+    top_k: Optional[int] = 3
+    model: Optional[str] = "llama3"
+    include_classification: Optional[bool] = True
+
 class SheetPreviewResponse(BaseModel):
     success: bool
     message: str
@@ -106,6 +114,14 @@ class MultiSheetProcessResponse(BaseModel):
     message: str
     results: Dict[str, List[Dict[str, Any]]]
     summary: Dict[str, Dict[str, int]]
+    session_id: str
+
+class MultiSheetRAGResponse(BaseModel):
+    success: bool
+    message: str
+    results: Dict[str, List[Dict[str, Any]]]
+    summary: Dict[str, Dict[str, int]]
+    responses: Dict[str, List[Dict[str, Any]]]
     session_id: str
 
 # Health check endpoint
@@ -356,6 +372,124 @@ async def process_multi_sheet(request: MultiSheetProcessRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing multi-sheet file: {str(e)}")
 
+@app.post("/api/sheets/process-multi-sheet-rag")
+async def process_multi_sheet_rag(request: MultiSheetRAGRequest):
+    """Process all sheets with both classification and RAG response generation"""
+    if request.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session_data = sessions[request.session_id]
+    
+    # Check if it's an Excel file
+    if session_data['file_type'] not in {'.xlsx', '.xls'}:
+        raise HTTPException(status_code=400, detail="Multi-sheet RAG processing only available for Excel files")
+    
+    try:
+        # Initialize components
+        classifier = RequirementClassifier()
+        rag_pipeline = RAGPipeline()
+        temp_file_path = session_data['temp_file_path']
+        
+        # Step 1: Process sheets for classification if requested
+        classification_results = {}
+        classification_summary = {}
+        
+        if request.include_classification:
+            classification_results = classifier.process_multi_sheet_rfp(
+                file_path=temp_file_path,
+                requirement_columns=request.requirement_columns
+            )
+            classification_summary = classifier.get_classification_summary(classification_results)
+        
+        # Step 2: Generate RAG responses for each sheet
+        rag_responses = {}
+        
+        # Get all requirements from all sheets
+        all_sheet_requirements = {}
+        
+        if request.include_classification and classification_results:
+            # Use classified requirements
+            for sheet_name, sheet_results in classification_results.items():
+                all_sheet_requirements[sheet_name] = [result['requirement'] for result in sheet_results]
+        else:
+            # Extract requirements directly without classification
+            excel_file = pd.ExcelFile(temp_file_path)
+            sheet_names = excel_file.sheet_names
+            
+            for sheet_name in sheet_names:
+                df = pd.read_excel(temp_file_path, sheet_name=sheet_name)
+                requirements = classifier._extract_requirements_from_dataframe(
+                    df, 
+                    request.requirement_columns or ['requirements', 'requirement', 'description', 'details']
+                )
+                all_sheet_requirements[sheet_name] = requirements
+        
+        # Generate responses for each sheet
+        for sheet_name, requirements in all_sheet_requirements.items():
+            if not requirements:
+                rag_responses[sheet_name] = []
+                continue
+                
+            sheet_responses = []
+            
+            for i, requirement in enumerate(requirements):
+                try:
+                    # Generate response using RAG
+                    rag_result = rag_pipeline.ask(
+                        query=requirement,
+                        top_k=request.top_k,
+                        include_quality_score=True,
+                        include_category=request.include_classification
+                    )
+                    
+                    # Combine classification and RAG data
+                    response_data = {
+                        'requirement_id': f"{sheet_name}_req_{i}",
+                        'requirement': requirement,
+                        'response': rag_result.get('answer', 'No response generated'),
+                        'quality_score': rag_result.get('quality_score', 0),
+                        'quality_status': rag_result.get('quality_status', 'unknown'),
+                        'context_sources': [rag_result.get('context', '')],
+                        'sheet_name': sheet_name,
+                        'category': rag_result.get('category', 'Unknown'),
+                        'status': 'success' if rag_result.get('answer') else 'failed'
+                    }
+                    
+                    sheet_responses.append(response_data)
+                    
+                except Exception as e:
+                    # Handle individual requirement errors
+                    sheet_responses.append({
+                        'requirement_id': f"{sheet_name}_req_{i}",
+                        'requirement': requirement,
+                        'response': f"Error generating response: {str(e)}",
+                        'quality_score': 0,
+                        'quality_status': 'error',
+                        'context_sources': [],
+                        'sheet_name': sheet_name,
+                        'category': 'Unknown',
+                        'status': 'failed'
+                    })
+            
+            rag_responses[sheet_name] = sheet_responses
+        
+        # Update session data
+        session_data['multi_sheet_rag_results'] = rag_responses
+        session_data['multi_sheet_classification_results'] = classification_results
+        session_data['multi_sheet_summary'] = classification_summary
+        
+        return MultiSheetRAGResponse(
+            success=True,
+            message=f"Successfully processed {len(rag_responses)} sheets with RAG responses",
+            results=classification_results,
+            summary=classification_summary,
+            responses=rag_responses,
+            session_id=request.session_id
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing multi-sheet RAG: {str(e)}")
+
 @app.get("/api/sheets/export/{session_id}")
 async def export_multi_sheet_results(session_id: str):
     """Export multi-sheet processing results to Excel file"""
@@ -364,19 +498,25 @@ async def export_multi_sheet_results(session_id: str):
     
     session_data = sessions[session_id]
     
-    if 'multi_sheet_results' not in session_data:
+    # Check for either classification results or RAG results
+    if 'multi_sheet_results' not in session_data and 'multi_sheet_rag_results' not in session_data:
         raise HTTPException(status_code=400, detail="No multi-sheet results found. Process the file first.")
     
     try:
-        classifier = RequirementClassifier()
-        results = session_data['multi_sheet_results']
-        
         # Create temporary output file
         temp_dir = Path("temp_uploads")
         output_path = temp_dir / f"{session_id}_classified_results.xlsx"
         
-        # Export results
-        classifier.export_results_to_excel(results, str(output_path))
+        # Use RAG results if available, otherwise classification results
+        if 'multi_sheet_rag_results' in session_data:
+            results = session_data['multi_sheet_rag_results']
+            # Export RAG results with responses
+            export_multi_sheet_rag_results(results, str(output_path))
+        else:
+            results = session_data['multi_sheet_results']
+            # Export classification results only
+            classifier = RequirementClassifier()
+            classifier.export_results_to_excel(results, str(output_path))
         
         # Return file for download
         return FileResponse(
@@ -388,6 +528,69 @@ async def export_multi_sheet_results(session_id: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error exporting results: {str(e)}")
+
+def export_multi_sheet_rag_results(results: Dict[str, List[Dict[str, Any]]], output_path: str):
+    """Export multi-sheet RAG results to Excel with responses"""
+    try:
+        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+            
+            # Create a summary sheet
+            summary_data = []
+            for sheet_name, sheet_results in results.items():
+                if sheet_results:
+                    category_counts = {}
+                    total_responses = len(sheet_results)
+                    successful_responses = sum(1 for r in sheet_results if r.get('status') == 'success')
+                    
+                    for result in sheet_results:
+                        category = result.get('category', 'Unknown')
+                        category_counts[category] = category_counts.get(category, 0) + 1
+                    
+                    # Add summary row for this sheet
+                    summary_data.append({
+                        'Sheet': sheet_name,
+                        'Total_Requirements': total_responses,
+                        'Successful_Responses': successful_responses,
+                        'Success_Rate': f"{(successful_responses/total_responses)*100:.1f}%" if total_responses > 0 else "0%"
+                    })
+                    
+                    # Add category breakdown
+                    for category, count in category_counts.items():
+                        summary_data.append({
+                            'Sheet': f"  └─ {category}",
+                            'Total_Requirements': count,
+                            'Successful_Responses': '',
+                            'Success_Rate': ''
+                        })
+            
+            summary_df = pd.DataFrame(summary_data)
+            summary_df.to_excel(writer, sheet_name='Summary', index=False)
+            
+            # Create detailed sheets for each original sheet
+            for sheet_name, sheet_results in results.items():
+                if sheet_results:
+                    df_data = []
+                    for result in sheet_results:
+                        df_data.append({
+                            'Requirement': result.get('requirement', ''),
+                            'Response': result.get('response', ''),
+                            'Category': result.get('category', 'Unknown'),
+                            'Quality_Score': result.get('quality_score', 0),
+                            'Quality_Status': result.get('quality_status', 'unknown'),
+                            'Status': result.get('status', 'unknown'),
+                            'Context_Sources': len(result.get('context_sources', []))
+                        })
+                    
+                    df = pd.DataFrame(df_data)
+                    # Truncate sheet name if too long (Excel limit is 31 characters)
+                    safe_sheet_name = sheet_name[:31] if len(sheet_name) > 31 else sheet_name
+                    df.to_excel(writer, sheet_name=f"{safe_sheet_name}_Results", index=False)
+        
+        print(f"RAG results exported to: {output_path}")
+        
+    except Exception as e:
+        print(f"Error exporting RAG results to Excel: {e}")
+        raise
 
 # Get generated responses for a session
 @app.get("/api/responses/{session_id}")
