@@ -32,6 +32,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 # Import our existing RAG components
 from app.rag_pipeline import RAGPipeline
+from app.requirement_classifier import RequirementClassifier
 from ingestion.requirement_extractor import RequirementExtractor, extract_requirements_from_file
 from ingestion.rfp_response_indexer import RFPResponseIndexer
 from retrieval.vector_store import VectorStore
@@ -88,6 +89,24 @@ class APIResponse(BaseModel):
     message: str
     data: Optional[Any] = None
     session_id: Optional[str] = None
+
+class MultiSheetProcessRequest(BaseModel):
+    session_id: str
+    requirement_columns: Optional[List[str]] = None
+
+class SheetPreviewResponse(BaseModel):
+    success: bool
+    message: str
+    sheet_names: List[str]
+    previews: Dict[str, Dict[str, Any]]
+    session_id: str
+
+class MultiSheetProcessResponse(BaseModel):
+    success: bool
+    message: str
+    results: Dict[str, List[Dict[str, Any]]]
+    summary: Dict[str, Dict[str, int]]
+    session_id: str
 
 # Health check endpoint
 @app.get("/")
@@ -259,6 +278,116 @@ async def get_requirements(session_id: str):
             'total_requirements': len(session_data['requirements'])
         }
     )
+
+# Multi-sheet processing endpoints
+@app.get("/api/sheets/preview/{session_id}")
+async def preview_sheets(session_id: str):
+    """Preview all sheets in an uploaded Excel file"""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session_data = sessions[session_id]
+    
+    # Check if it's an Excel file
+    if session_data['file_type'] not in {'.xlsx', '.xls'}:
+        raise HTTPException(status_code=400, detail="Multi-sheet preview only available for Excel files")
+    
+    try:
+        classifier = RequirementClassifier()
+        temp_file_path = session_data['temp_file_path']
+        
+        # Get sheet names
+        sheet_names = classifier.get_sheet_names(temp_file_path)
+        
+        # Preview each sheet
+        previews = {}
+        for sheet_name in sheet_names:
+            preview = classifier.preview_sheet_data(temp_file_path, sheet_name, max_rows=3)
+            previews[sheet_name] = preview
+        
+        return SheetPreviewResponse(
+            success=True,
+            message=f"Found {len(sheet_names)} sheets in the file",
+            sheet_names=sheet_names,
+            previews=previews,
+            session_id=session_id
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error previewing sheets: {str(e)}")
+
+@app.post("/api/sheets/process-multi-sheet")
+async def process_multi_sheet(request: MultiSheetProcessRequest):
+    """Process all sheets in an Excel file for requirement classification"""
+    if request.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session_data = sessions[request.session_id]
+    
+    # Check if it's an Excel file
+    if session_data['file_type'] not in {'.xlsx', '.xls'}:
+        raise HTTPException(status_code=400, detail="Multi-sheet processing only available for Excel files")
+    
+    try:
+        classifier = RequirementClassifier()
+        temp_file_path = session_data['temp_file_path']
+        
+        # Process all sheets
+        results = classifier.process_multi_sheet_rfp(
+            file_path=temp_file_path,
+            requirement_columns=request.requirement_columns
+        )
+        
+        # Get summary
+        summary = classifier.get_classification_summary(results)
+        
+        # Update session data with multi-sheet results
+        session_data['multi_sheet_results'] = results
+        session_data['multi_sheet_summary'] = summary
+        
+        return MultiSheetProcessResponse(
+            success=True,
+            message=f"Successfully processed {len(results)} sheets",
+            results=results,
+            summary=summary,
+            session_id=request.session_id
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing multi-sheet file: {str(e)}")
+
+@app.get("/api/sheets/export/{session_id}")
+async def export_multi_sheet_results(session_id: str):
+    """Export multi-sheet processing results to Excel file"""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session_data = sessions[session_id]
+    
+    if 'multi_sheet_results' not in session_data:
+        raise HTTPException(status_code=400, detail="No multi-sheet results found. Process the file first.")
+    
+    try:
+        classifier = RequirementClassifier()
+        results = session_data['multi_sheet_results']
+        
+        # Create temporary output file
+        temp_dir = Path("temp_uploads")
+        output_path = temp_dir / f"{session_id}_classified_results.xlsx"
+        
+        # Export results
+        classifier.export_results_to_excel(results, str(output_path))
+        
+        # Return file for download
+        return FileResponse(
+            path=str(output_path),
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            filename=f"classified_results_{session_data['uploaded_file']}",
+            headers={"Content-Disposition": "attachment"}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exporting results: {str(e)}")
 
 # Get generated responses for a session
 @app.get("/api/responses/{session_id}")
