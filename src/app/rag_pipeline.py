@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.retrieval.embeddings import embed_text
 from src.vector_store.vector_store import FAISSStore
-from app.quality_scorer import RFPQualityScorer
+from src.app.quality_scorer import RFPQualityScorer
 
 class RAGPipeline:
     def __init__(self, store_dir="test_store", ollama_url="http://localhost:11434", model="llama3"):
