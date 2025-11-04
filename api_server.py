@@ -102,6 +102,13 @@ class MultiSheetRAGRequest(BaseModel):
     model: Optional[str] = "llama3"
     include_classification: Optional[bool] = True
 
+class UpdateResponseRequest(BaseModel):
+    session_id: str
+    requirement_id: Optional[str] = None
+    requirement_index: Optional[int] = None
+    new_response: str
+    sheet_name: Optional[str] = None  # For multi-sheet responses
+
 class SheetPreviewResponse(BaseModel):
     success: bool
     message: str
@@ -628,6 +635,90 @@ async def get_responses(session_id: str):
             }
         }
     )
+
+@app.put("/api/responses/update")
+async def update_response(request: UpdateResponseRequest):
+    """Update a specific response in a session"""
+    try:
+        if request.session_id not in sessions:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session_data = sessions[request.session_id]
+        
+        # Handle single sheet responses
+        if 'responses' in session_data and not request.sheet_name:
+            responses = session_data['responses']
+            
+            # Find the response to update
+            response_index = None
+            if request.requirement_id:
+                # Find by requirement_id
+                for i, response in enumerate(responses):
+                    if response.get('requirement_id') == request.requirement_id:
+                        response_index = i
+                        break
+            elif request.requirement_index is not None:
+                # Use direct index
+                if 0 <= request.requirement_index < len(responses):
+                    response_index = request.requirement_index
+            
+            if response_index is None:
+                raise HTTPException(status_code=404, detail="Response not found")
+            
+            # Update the response
+            responses[response_index]['response'] = request.new_response
+            responses[response_index]['last_modified'] = datetime.now().isoformat()
+            
+            return APIResponse(
+                success=True,
+                message="Response updated successfully",
+                session_id=request.session_id,
+                data={
+                    'updated_response': responses[response_index],
+                    'index': response_index
+                }
+            )
+        
+        # Handle multi-sheet responses
+        elif 'multi_sheet_rag_results' in session_data and request.sheet_name:
+            multi_sheet_responses = session_data['multi_sheet_rag_results']
+            
+            if request.sheet_name not in multi_sheet_responses:
+                raise HTTPException(status_code=404, detail=f"Sheet '{request.sheet_name}' not found")
+            
+            sheet_responses = multi_sheet_responses[request.sheet_name]
+            
+            # Find the response to update
+            response_index = None
+            if request.requirement_index is not None:
+                if 0 <= request.requirement_index < len(sheet_responses):
+                    response_index = request.requirement_index
+            
+            if response_index is None:
+                raise HTTPException(status_code=404, detail="Response not found in sheet")
+            
+            # Update the response
+            sheet_responses[response_index]['response'] = request.new_response
+            sheet_responses[response_index]['last_modified'] = datetime.now().isoformat()
+            
+            return APIResponse(
+                success=True,
+                message="Multi-sheet response updated successfully",
+                session_id=request.session_id,
+                data={
+                    'updated_response': sheet_responses[response_index],
+                    'sheet_name': request.sheet_name,
+                    'index': response_index
+                }
+            )
+        
+        else:
+            raise HTTPException(status_code=404, detail="No responses found for this session")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating response: {str(e)}")
 
 # Direct query endpoint
 @app.post("/api/query")
